@@ -22,11 +22,23 @@ jobs:
       - name: Build
         run: npm run build -- --base-href="/turnauskaavio/"
 
-      - name: Deploy to public repo
-        uses: JamesIves/github-pages-deploy-action@v4
-        with:
-          folder: dist/turnaus/browser
-          repository-name: kalub70/kalub70.github.io
-          target-folder: turnauskaavio
-          branch: main
-          token: ${{ secrets.DEPLOY_TOKEN }}
+      # Clone the target repository first
+      - name: Clone target repository
+        run: |
+          git clone https://x-access-token:${{ secrets.DEPLOY_TOKEN }}@github.com/kalub70/kalub70.github.io.git target-repo
+      
+      # Copy your build files
+      - name: Copy build files
+        run: |
+          mkdir -p target-repo/turnauskaavio
+          cp -r dist/turnaus/browser/* target-repo/turnauskaavio/
+      
+      # Commit and push changes
+      - name: Commit and push
+        run: |
+          cd target-repo
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Deploy turnauskaavio from private repo"
+          git push
