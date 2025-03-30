@@ -1,0 +1,32 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build -- --base-href="/turnauskaavio/"
+
+      - name: Deploy to public repo
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist/turnaus/browser
+          repository-name: kalub70/kalub70.github.io
+          target-folder: turnauskaavio
+          branch: main
+          token: ${{ secrets.DEPLOY_TOKEN }}
