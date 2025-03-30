@@ -624,10 +624,11 @@ export class TournamentService {
         if (a.round !== b.round) return a.round - b.round;
         return a.position - b.position;
       });
-
-    this.currentMatch =
-      incompleteMatches.length > 0 ? incompleteMatches[0] : null;
-
+  
+    // Store previous match to avoid unnecessary UI updates
+    const previousMatch = this.currentMatch;
+    this.currentMatch = incompleteMatches.length > 0 ? incompleteMatches[0] : null;
+  
     // If all matches are complete, we have a winner
     if (!this.currentMatch && this.isStarted) {
       const finalMatch = this.matches[this.matches.length - 1];
@@ -637,7 +638,7 @@ export class TournamentService {
         this.showVictoryAnimation = true;
       }
     }
-
+  
     this.showMatchVictoryAnimation = false;
   }
 
@@ -838,102 +839,168 @@ export class TournamentService {
 
   advancePlayerToNextRound(match: Match): void {
     if (!match.winner) return;
-
+  
     // Skip if this is the final match
     if (match.round >= this.matches.length - 1) return;
-
+  
     const nextRound = match.round + 1;
     const nextPosition = Math.floor(match.position / 2);
     const nextMatch = this.matches.find(
       (m) => m.round === nextRound && m.position === nextPosition
     );
-
+  
     if (!nextMatch) {
       console.error(
         `Could not find next match: round ${nextRound}, position ${nextPosition}`
       );
       return;
     }
-
+  
     // Determine if winner goes to player1 or player2 slot
     if (match.position % 2 === 0) {
       nextMatch.player1Id = match.winner;
     } else {
       nextMatch.player2Id = match.winner;
     }
-
-    // If both players are set for the next match, it becomes the current match
+  
+    // Don't immediately update the current match - wait for animation to complete
+    // The currentMatch will be updated in findNextMatch after the animation
+  
+    // If both players are set for the next match and both came from bye matches, 
+    // it becomes immediately complete (auto-advancement)
     if (nextMatch.player1Id !== null && nextMatch.player2Id !== null) {
-      // Only make it the current match if we're still looking for one
-      if (!this.currentMatch || this.currentMatch.isComplete) {
-        this.currentMatch = nextMatch;
+      const shouldAutoComplete = this.shouldAutoCompleteMatch(nextMatch, nextRound);
+      
+      if (shouldAutoComplete) {
+        this.autoCompleteMatch(nextMatch);
       }
     }
-    // If only one player is set and the other match is complete, check if it should be auto-completed (bye)
+    // If only one player is set and the other match is complete with no winner,
+    // check if it should be auto-completed (bye)
     else if (nextMatch.player1Id !== null || nextMatch.player2Id !== null) {
-      // Find if there would be another player coming from another match
-      const otherPosition =
-        match.position % 2 === 0 ? match.position + 1 : match.position - 1;
-      const otherMatch = this.matches.find(
-        (m) => m.round === match.round && m.position === otherPosition
-      );
-
-      // Handle cases where there's a bye:
-      // 1. Other match doesn't exist
-      // 2. Other match is complete with no winner (both players were null/bye)
-      // 3. Other match has a player that's null (no player will advance from there)
-      if (
-        !otherMatch ||
-        (otherMatch.isComplete && otherMatch.winner === null) ||
-        (otherMatch.isComplete &&
-          otherMatch.player1Id === null &&
-          otherMatch.player2Id === null)
-      ) {
-        const winnerId =
-          nextMatch.player1Id !== null
-            ? nextMatch.player1Id
-            : nextMatch.player2Id;
-        if (!winnerId) return; // Sanity check
-
-        nextMatch.winner = winnerId;
-        nextMatch.player1Score =
-          nextMatch.player1Id === winnerId ? Math.ceil(this.bestOfLegs / 2) : 0;
-        nextMatch.player2Score =
-          nextMatch.player2Id === winnerId ? Math.ceil(this.bestOfLegs / 2) : 0;
-        nextMatch.player1Legs =
-          nextMatch.player1Id === winnerId ? Math.ceil(this.bestOfLegs / 2) : 0;
-        nextMatch.player2Legs =
-          nextMatch.player2Id === winnerId ? Math.ceil(this.bestOfLegs / 2) : 0;
-        nextMatch.isComplete = true;
-
-        // Record match history for the bye
-        const matchResult = {
-          matchId: nextMatch.id,
-          player1Name: nextMatch.player1Id
-            ? this.getPlayerName(nextMatch.player1Id)
-            : 'Bye',
-          player2Name: nextMatch.player2Id
-            ? this.getPlayerName(nextMatch.player2Id)
-            : 'Bye',
-          player1Score: nextMatch.player1Score || 0,
-          player2Score: nextMatch.player2Score || 0,
-          player1Legs: nextMatch.player1Legs,
-          player2Legs: nextMatch.player2Legs,
-          winnerName: this.getPlayerName(winnerId),
-          timestamp: new Date(),
-          gameMode: this.gameMode,
-        };
-
-        this.matchHistory.push(matchResult);
-
-        // Save to localStorage after adding match history
-        this.saveToLocalStorage();
-
-        // Recursively advance this player
-        this.advancePlayerToNextRound(nextMatch);
-      }
+      this.handlePotentialByeMatch(nextMatch, match, nextRound);
     }
   }
+
+  // New helper methods for improved match advancement logic
+private shouldAutoCompleteMatch(match: Match, round: number): boolean {
+  // Check if both players came from bye matches
+  const player1Match = this.getMatchForPlayerInPreviousRound(match.player1Id, round);
+  const player2Match = this.getMatchForPlayerInPreviousRound(match.player2Id, round);
+  
+  // If either match doesn't exist, we can't determine if it was a bye
+  if (!player1Match || !player2Match) return false;
+  
+  // Check if both previous matches were byes
+  const player1FromBye = this.wasMatchAutoCompleted(player1Match);
+  const player2FromBye = this.wasMatchAutoCompleted(player2Match);
+  
+  return player1FromBye && player2FromBye;
+}
+
+private getMatchForPlayerInPreviousRound(playerId: number | null, currentRound: number): Match | undefined {
+  if (!playerId) return undefined;
+  
+  // Find match in previous round where this player was the winner
+  return this.matches.find(m => 
+    m.round === currentRound - 1 && 
+    m.winner === playerId
+  );
+}
+
+private wasMatchAutoCompleted(match: Match | undefined): boolean {
+  if (!match) return false;
+  
+  // A match was auto-completed if:
+  // 1. One player was null (bye)
+  // 2. The match was completed very quickly (no real game played)
+  return (match.player1Id === null || match.player2Id === null) && match.isComplete;
+}
+
+private autoCompleteMatch(match: Match): void {
+  // For auto-completed matches, we pick a random winner
+  // In a real tournament, this could be based on seeding or other factors
+  const isPlayer1Winner = Math.random() > 0.5;
+  
+  match.winner = isPlayer1Winner ? match.player1Id : match.player2Id;
+  match.player1Score = isPlayer1Winner ? Math.ceil(this.bestOfLegs / 2) : 0;
+  match.player2Score = isPlayer1Winner ? 0 : Math.ceil(this.bestOfLegs / 2);
+  match.player1Legs = isPlayer1Winner ? Math.ceil(this.bestOfLegs / 2) : 0;
+  match.player2Legs = isPlayer1Winner ? 0 : Math.ceil(this.bestOfLegs / 2);
+  match.isComplete = true;
+
+  // Record match history for the auto-completed match
+  const matchResult = {
+    matchId: match.id,
+    player1Name: match.player1Id ? this.getPlayerName(match.player1Id) : 'Unknown',
+    player2Name: match.player2Id ? this.getPlayerName(match.player2Id) : 'Unknown',
+    player1Score: match.player1Score || 0,
+    player2Score: match.player2Score || 0,
+    player1Legs: match.player1Legs,
+    player2Legs: match.player2Legs,
+    winnerName: this.getPlayerName(match.winner!),
+    timestamp: new Date(),
+    gameMode: this.gameMode
+  };
+
+  this.matchHistory.push(matchResult);
+  this.saveToLocalStorage();
+
+  // Advance this player to the next round
+  this.advancePlayerToNextRound(match);
+}
+
+private handlePotentialByeMatch(nextMatch: Match, currentMatch: Match, nextRound: number): void {
+  // Find if there would be another player coming from another match
+  const otherPosition = currentMatch.position % 2 === 0 
+    ? currentMatch.position + 1 
+    : currentMatch.position - 1;
+  
+  const otherMatch = this.matches.find(
+    (m) => m.round === currentMatch.round && m.position === otherPosition
+  );
+
+  // Handle cases where there's a bye:
+  // 1. Other match doesn't exist
+  // 2. Other match is complete with no winner (both players were null/bye)
+  // 3. Other match has a player that's null (no player will advance from there)
+  if (
+    !otherMatch ||
+    (otherMatch.isComplete && otherMatch.winner === null) ||
+    (otherMatch.isComplete && otherMatch.player1Id === null && otherMatch.player2Id === null)
+  ) {
+    const winnerId = nextMatch.player1Id !== null ? nextMatch.player1Id : nextMatch.player2Id;
+    if (!winnerId) return; // Sanity check
+
+    nextMatch.winner = winnerId;
+    nextMatch.player1Score = nextMatch.player1Id === winnerId ? Math.ceil(this.bestOfLegs / 2) : 0;
+    nextMatch.player2Score = nextMatch.player2Id === winnerId ? Math.ceil(this.bestOfLegs / 2) : 0;
+    nextMatch.player1Legs = nextMatch.player1Id === winnerId ? Math.ceil(this.bestOfLegs / 2) : 0;
+    nextMatch.player2Legs = nextMatch.player2Id === winnerId ? Math.ceil(this.bestOfLegs / 2) : 0;
+    nextMatch.isComplete = true;
+
+    // Record match history for the bye
+    const matchResult = {
+      matchId: nextMatch.id,
+      player1Name: nextMatch.player1Id ? this.getPlayerName(nextMatch.player1Id) : 'Bye',
+      player2Name: nextMatch.player2Id ? this.getPlayerName(nextMatch.player2Id) : 'Bye',
+      player1Score: nextMatch.player1Score || 0,
+      player2Score: nextMatch.player2Score || 0,
+      player1Legs: nextMatch.player1Legs,
+      player2Legs: nextMatch.player2Legs,
+      winnerName: this.getPlayerName(winnerId),
+      timestamp: new Date(),
+      gameMode: this.gameMode
+    };
+
+    this.matchHistory.push(matchResult);
+    this.saveToLocalStorage();
+
+    // Recursively advance this player to the next round
+    this.advancePlayerToNextRound(nextMatch);
+  }
+}
+  
 
   getPlayerName(playerId: number): string {
     const player = this.players.find((p) => p.id === playerId);

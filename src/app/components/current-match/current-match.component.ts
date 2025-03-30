@@ -163,19 +163,23 @@ export class CurrentMatchComponent {
         gameMode: this.tournamentService.gameMode
       });
       
-      // Advance winner to next round
-      this.tournamentService.advancePlayerToNextRound(match);
+      // Store the winner name before advancing (for the animation)
+      this.winnerName = this.tournamentService.getPlayerName(match.winner!);
       
       // Check if this is the final match
       const isFinalMatch = this.isFinalMatch(match);
+      
+      // Advance winner to next round
+      this.tournamentService.advancePlayerToNextRound(match);
       
       if (isFinalMatch) {
         // If it's the final match, skip the animation and go directly to tournament end
         this.tournamentService.findNextMatch();
       } else {
         // Show winner animation for non-final matches
-        this.winnerName = this.tournamentService.getPlayerName(match.winner!);
         this.tournamentService.showMatchVictoryAnimation = true;
+        
+        // Don't find the next match yet - this will be done after the animation completes
       }
     }
   }

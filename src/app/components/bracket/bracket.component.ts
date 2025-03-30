@@ -58,6 +58,9 @@ import { TournamentService, Match } from '../../services/tournament.service';
       flex-direction: column;
       justify-content: space-evenly; /* Center the final match vertically */
     }
+    .bye-match {
+      opacity: 0.7;
+    }
   `],
   template: `
     <div class="bg-gray-100 p-6 rounded-lg shadow">
@@ -74,7 +77,8 @@ import { TournamentService, Match } from '../../services/tournament.service';
             </div>
             
             <div *ngFor="let match of roundMatches; let i = index" 
-                 class="mb-8 match-container">
+                 class="mb-8 match-container"
+                 [class.bye-match]="isByeMatch(match)">
               
               <div class="player-card match-connector" 
                    [class.border-l-4]="match.winner === match.player1Id" 
@@ -208,6 +212,11 @@ export class BracketComponent {
     }
     
     return { 'margin-bottom': '2rem' }; // Default
+  }
+  
+  // New method to check if a match is a bye match
+  isByeMatch(match: Match): boolean {
+    return (match.player1Id === null || match.player2Id === null) && match.isComplete;
   }
   
   undoLastMatch(): void {

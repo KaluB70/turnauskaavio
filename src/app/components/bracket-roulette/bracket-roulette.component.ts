@@ -7,7 +7,11 @@ import { trigger, state, style, animate, transition } from '@angular/animations'
 interface PlayerPair {
   player1: Player | null;
   player2: Player | null;
-  locked: boolean;
+  player1Locked: boolean;
+  player2Locked: boolean;
+  fullyLocked: boolean;
+  isBye: boolean;
+  matchNumber: number; // Add match number for proper counting
 }
 
 @Component({
@@ -49,6 +53,14 @@ interface PlayerPair {
     .player-card {
       transition: all 0.3s ease;
     }
+    .player-card.locked {
+      background-color: #dbeafe !important;
+      border-left: 4px solid #3b82f6;
+    }
+    .player-card.locked-bye {
+      background-color: #f3f4f6 !important;
+      border-left: 4px solid #9ca3af;
+    }
     .name-roll {
       animation: nameChange 150ms linear infinite;
     }
@@ -83,6 +95,10 @@ interface PlayerPair {
         opacity: 0;
       }
     }
+    .bye-match {
+      opacity: 0.7;
+      border-style: dashed !important;
+    }
   `],
   template: `
     <div class="bg-blue-100 p-6 rounded-lg shadow-lg relative overflow-hidden" @fadeIn>
@@ -105,24 +121,36 @@ interface PlayerPair {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <div *ngFor="let pair of playerPairs; let i = index" 
                class="player-pair bg-white p-4 rounded-lg border-2" 
-               [class.border-blue-300]="!pair.locked"
-               [class.border-green-500]="pair.locked"
-               [@cardFlip]="pair.locked ? 'locked' : 'spinning'">
+               [class.border-blue-300]="!pair.fullyLocked"
+               [class.border-green-500]="pair.fullyLocked && !pair.isBye"
+               [class.bye-match]="pair.fullyLocked && pair.isBye">
             
             <div class="flex justify-between items-center mb-2">
-              <span class="text-sm text-gray-500">Ottelu {{ i + 1 }}</span>
-              <span *ngIf="pair.locked" class="text-sm bg-green-100 text-green-800 px-2 py-1 rounded-full">
+              <span class="text-sm text-gray-500">
+                <ng-container *ngIf="pair.fullyLocked">
+                  <ng-container *ngIf="!pair.isBye">Ottelu {{ pair.matchNumber }}</ng-container>
+                  <ng-container *ngIf="pair.isBye">Vapaa-kierros</ng-container>
+                </ng-container>
+                <ng-container *ngIf="!pair.fullyLocked">
+                  Paikka {{ i + 1 }}
+                </ng-container>
+              </span>
+              <span *ngIf="pair.fullyLocked && !pair.isBye" class="text-sm bg-green-100 text-green-800 px-2 py-1 rounded-full">
                 Lukittu!
+              </span>
+              <span *ngIf="pair.fullyLocked && pair.isBye" class="text-sm bg-gray-100 text-gray-800 px-2 py-1 rounded-full">
+                Eteneminen suoraan
               </span>
             </div>
             
             <div class="flex justify-between items-center">
               <div class="player-card flex-1 p-3 rounded-md" 
-                   [class.bg-gray-100]="!pair.locked"
-                   [class.bg-blue-50]="pair.locked && pair.player1">
-                <span *ngIf="pair.player1">{{ pair.player1.name }}</span>
-                <span *ngIf="!pair.player1 && pair.locked" class="text-gray-500">Bye</span>
-                <span *ngIf="!pair.player1 && !pair.locked" class="text-gray-600">
+                   [class.bg-gray-100]="!pair.player1Locked"
+                   [class.locked]="pair.player1Locked && pair.player1"
+                   [class.locked-bye]="pair.player1Locked && !pair.player1">
+                <span *ngIf="pair.player1 && pair.player1Locked">{{ pair.player1.name }}</span>
+                <span *ngIf="!pair.player1 && pair.player1Locked" class="text-gray-500">Bye</span>
+                <span *ngIf="!pair.player1Locked" class="text-gray-600">
                   <span class="inline-block name-roll" [style.animation-duration.ms]="getAnimationSpeed(i, 0)">
                     {{ getRollingName(i, 0) }}
                   </span>
@@ -132,11 +160,12 @@ interface PlayerPair {
               <div class="mx-2 text-lg font-bold">vs</div>
               
               <div class="player-card flex-1 p-3 rounded-md text-right" 
-                   [class.bg-gray-100]="!pair.locked"
-                   [class.bg-blue-50]="pair.locked && pair.player2">
-                <span *ngIf="pair.player2">{{ pair.player2.name }}</span>
-                <span *ngIf="!pair.player2 && pair.locked" class="text-gray-500">Bye</span>
-                <span *ngIf="!pair.player2 && !pair.locked" class="text-gray-600">
+                   [class.bg-gray-100]="!pair.player2Locked"
+                   [class.locked]="pair.player2Locked && pair.player2"
+                   [class.locked-bye]="pair.player2Locked && !pair.player2">
+                <span *ngIf="pair.player2 && pair.player2Locked">{{ pair.player2.name }}</span>
+                <span *ngIf="!pair.player2 && pair.player2Locked" class="text-gray-500">Bye</span>
+                <span *ngIf="!pair.player2Locked" class="text-gray-600">
                   <span class="inline-block name-roll" [style.animation-duration.ms]="getAnimationSpeed(i, 1)"
                         [class.slowing-down]="isSlowingDown(i)">
                     {{ getRollingName(i, 1) }}
@@ -238,7 +267,11 @@ export class BracketRouletteComponent implements OnInit {
       this.playerPairs.push({
         player1: null,
         player2: null,
-        locked: false
+        player1Locked: false,
+        player2Locked: false,
+        fullyLocked: false,
+        isBye: false,
+        matchNumber: i + 1 // Initialize with sequential numbers
       });
       
       // Initialize rolling names for this pair
@@ -281,12 +314,18 @@ export class BracketRouletteComponent implements OnInit {
     // Update rolling names at a rapid interval
     this.rollingInterval = setInterval(() => {
       Object.keys(this.rollingNames).forEach(key => {
-        // Only roll if the pair isn't locked yet
+        // Only roll if this specific position isn't locked
         const [pairIndex, position] = key.split('-').map(Number);
-        if (pairIndex < this.playerPairs.length && !this.playerPairs[pairIndex].locked) {
-          // Rotate the array to create the rolling effect
-          const arr = this.rollingNames[key];
-          arr.push(arr.shift()!);
+        if (pairIndex < this.playerPairs.length) {
+          const pair = this.playerPairs[pairIndex];
+          // Check if this specific position is locked
+          const positionLocked = position === 0 ? pair.player1Locked : pair.player2Locked;
+          
+          if (!positionLocked) {
+            // Rotate the array to create the rolling effect
+            const arr = this.rollingNames[key];
+            arr.push(arr.shift()!);
+          }
         }
       });
     }, 100);
@@ -304,8 +343,12 @@ export class BracketRouletteComponent implements OnInit {
   // Determine if we're in the slowing down phase for this pair
   isSlowingDown(pairIndex: number): boolean {
     // The next pair to be locked is slowing down
-    const nextLockIndex = this.playerPairs.findIndex(pair => !pair.locked);
-    return pairIndex === nextLockIndex;
+    const pair = this.playerPairs[pairIndex];
+    return (pairIndex === this.getNextPairToLock()) && !pair.fullyLocked;
+  }
+  
+  getNextPairToLock(): number {
+    return this.playerPairs.findIndex(pair => !pair.fullyLocked);
   }
   
   // Get the animation speed - slow down as we approach locking
@@ -349,6 +392,7 @@ export class BracketRouletteComponent implements OnInit {
   
   assignPlayersAnimation(): void {
     let pairIndex = 0;
+    let playerIndex = 0;
     this.playDrumroll(1.20 + (pairIndex * 0.25));
     this.currentStep = 'Luodaan otteluparit';
     this.currentAction = 'Valitaan pelaajat otteluihin...';
@@ -365,8 +409,33 @@ export class BracketRouletteComponent implements OnInit {
     // true = player position, false = bye position
     const seedPositions = this.createSeedPositions(totalSlots, byeCount);
     
-    // Begin locking pairs one by one with delay
-    let playerIndex = 0;
+    // Prepare the players and determine which matches are byes
+    for (let i = 0; i < this.playerPairs.length; i++) {
+      const pair = this.playerPairs[i];
+      const pos1 = i * 2;
+      const pos2 = i * 2 + 1;
+      
+      // Determine if positions should be players or byes
+      const pos1IsBye = !seedPositions[pos1];
+      const pos2IsBye = !seedPositions[pos2];
+      
+      // Assign players to positions that should have players
+      if (!pos1IsBye && playerIndex < shuffledPlayers.length) {
+        pair.player1 = shuffledPlayers[playerIndex++];
+      }
+      
+      if (!pos2IsBye && playerIndex < shuffledPlayers.length) {
+        pair.player2 = shuffledPlayers[playerIndex++];
+      }
+      
+      // Mark as a bye match if one player is null
+      pair.isBye = (pair.player1 === null || pair.player2 === null);
+    }
+    
+    // Renumber matches first, before animations
+    this.renumberMatchesAfterByes();
+    
+
     
     // Processes each pair sequentially with delays between steps
     const lockNextPair = () => {
@@ -379,7 +448,7 @@ export class BracketRouletteComponent implements OnInit {
       const pair = this.playerPairs[pairIndex];
       
       // First, highlight that we're working on this pair
-      this.currentAction = `Arvotaan ottelua ${pairIndex + 1}...`;
+      this.currentAction = `Arvotaan ottelua ${pair.matchNumber}...`;
       
       // Speed up the audio as we're about to lock a pair
       this.playDrumroll(1.0 + (pairIndex * 0.15));
@@ -401,38 +470,73 @@ export class BracketRouletteComponent implements OnInit {
         pair.player2 = shuffledPlayers[playerIndex++];
       }
       
-      // Force the correct names to appear in the rolling display during slowdown
-      const key1 = `${pairIndex}-0`;
-      const key2 = `${pairIndex}-1`;
-      
-            // Slowdown animation phase (3 seconds)
-      if (pair.player1) {
-        this.rollingNames[key1] = [pair.player1.name, ...this.rollingNames[key1].filter(n => n !== pair.player1?.name)];
-      } else {
-        this.rollingNames[key1] = ["Bye", ...this.rollingNames[key1].filter(n => n !== "Bye")];
-      }
-      
-      if (pair.player2) {
-        this.rollingNames[key2] = [pair.player2.name, ...this.rollingNames[key2].filter(n => n !== pair.player2?.name)];
-      } else {
-        this.rollingNames[key2] = ["Bye", ...this.rollingNames[key2].filter(n => n !== "Bye")];
-      }
+      // Mark as a bye match if one player is null
+      pair.isBye = (pair.player1 === null || pair.player2 === null);
       
       // Further increase audio speed during the final locking moments
       this.playDrumroll(1.20 + (pairIndex * 0.25));
       
-      // After slowdown, lock in the players (3 seconds)
+      // Lock player 1 first
       setTimeout(() => {
-        // Lock the pair with dramatic pause
-        pair.locked = true;
-        this.currentAction = `Lukittu ottelu ${pairIndex + 1}!`;
+        if (pair.player1) {
+          pair.player1Locked = true;
+          const key1 = `${pairIndex}-0`;
+          this.rollingNames[key1] = [pair.player1.name];
+          this.currentAction = `${pair.player1.name} valittu otteluun ${pair.matchNumber}`;
+        } else {
+          pair.player1Locked = true;
+          const key1 = `${pairIndex}-0`;
+          this.rollingNames[key1] = ["Bye"];
+          
+          if (pair.isBye) {
+            this.currentAction = `Vapaa-kierros`;
+          } else {
+            this.currentAction = `Ensimmäinen pelipaikka on vapaa ottelussa ${pair.matchNumber}`;
+          }
+        }
         
-        // Add a pause before moving to the next pair (2 seconds)
-        pairIndex++;
+        // Lock player 2 after a delay
         setTimeout(() => {
-          lockNextPair(); // Process the next pair
-        }, 2000);
-      }, 3000);
+          if (pair.player2) {
+            pair.player2Locked = true;
+            const key2 = `${pairIndex}-1`;
+            this.rollingNames[key2] = [pair.player2.name];
+            if (pair.isBye) {
+              this.currentAction = `${pair.player2.name} saa vapaa-kierroksen`;
+            } else {
+              this.currentAction = `${pair.player2.name} valittu otteluun ${pair.matchNumber}`;
+            }
+          } else {
+            pair.player2Locked = true;
+            const key2 = `${pairIndex}-1`;
+            this.rollingNames[key2] = ["Bye"];
+            
+            if (pair.isBye) {
+              this.currentAction = `Vapaa-kierros`;
+            } else {
+              this.currentAction = `Toinen pelipaikka on vapaa ottelussa ${pair.matchNumber}`;
+            }
+          }
+          
+          // After both players are locked, complete the pair after delay
+          setTimeout(() => {
+            pair.fullyLocked = true;
+            
+            // Update action message based on whether it's a bye match
+            if (pair.isBye) {
+              this.currentAction = `Vapaa-kierros lukittu!`;
+            } else {
+              this.currentAction = `Lukittu ottelu ${pair.matchNumber}!`;
+            }
+            
+            // Add a pause before moving to the next pair
+            pairIndex++;
+            setTimeout(() => {
+              lockNextPair(); // Process the next pair
+            }, 1200);
+          }, 800);
+        }, 1500);
+      }, 1500);
     };
     
     // Start the sequential locking
@@ -491,18 +595,15 @@ export class BracketRouletteComponent implements OnInit {
     return positions;
   }
   
-  shouldPlaceBye(pairIndex: number, position: number, byeCount: number, totalPairs: number): boolean {
-    // This is a simplified version. In a real implementation, you'd need to
-    // carefully distribute byes to ensure they don't face each other
-    if (byeCount <= 0) return false;
+  // Renumber matches after byes are determined
+  renumberMatchesAfterByes(): void {
+    // Filter out the bye matches
+    const realMatches = this.playerPairs.filter(pair => !pair.isBye);
     
-    // Place byes starting from last pairs for this demo
-    // In a real tournament, you'd want to distribute them according to seeding rules
-    const positionInTotalSlots = pairIndex * 2 + position;
-    const totalSlots = totalPairs * 2;
-    
-    // Distribute byes starting from the last positions
-    return positionInTotalSlots >= totalSlots - byeCount;
+    // Renumber the real matches sequentially
+    realMatches.forEach((match, index) => {
+      match.matchNumber = index + 1;
+    });
   }
   
   finishAnimation(): void {
