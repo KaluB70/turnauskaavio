@@ -128,6 +128,7 @@ export class TournamentService {
     this.saveToLocalStorage();
   }
 
+  // Add this method to the TournamentService class
   registerPlayersWithPairings(
     pairings: Pairing[],
     gameMode: GameMode,
@@ -135,11 +136,11 @@ export class TournamentService {
   ): void {
     // Get all unique player names from pairings
     const playerNames: string[] = [];
-    pairings.forEach(pair => {
+    pairings.forEach((pair) => {
       if (pair.player1) playerNames.push(pair.player1);
       if (pair.player2) playerNames.push(pair.player2);
     });
-    
+
     // Create player objects with IDs
     this.players = playerNames
       .filter((name) => name.trim() !== '')
@@ -147,32 +148,23 @@ export class TournamentService {
         id: index + 1,
         name: name.trim(),
       }));
-  
+
     if (this.players.length < 2) {
       throw new Error('At least 2 players are required');
     }
-  
+
     this.gameMode = gameMode;
     this.bestOfLegs = bestOfLegs;
-  
-    // Generate bracket with exact pairings
-    this.generateBracketFromPairings(pairings);
-    this.isStarted = true;
-    this.findNextMatch();
-  }
-  
-  // New method to create brackets from explicit pairings
-  generateBracketFromPairings(pairings: Pairing[]): void {
-    const playerCount = this.players.length;
-    
-    // Find the smallest power of 2 that can accommodate all pairs
-    const rounds = Math.ceil(Math.log2(pairings.length * 2));
-    
+
+    // Find the smallest power of 2 that can accommodate all players
+    const rounds = Math.ceil(Math.log2(this.players.length));
+    const totalSlots = Math.pow(2, rounds);
+
     // Initialize all matches
     this.matches = [];
     for (let round = 0; round < rounds; round++) {
       const matchesInRound = Math.pow(2, rounds - round - 1);
-      
+
       for (let position = 0; position < matchesInRound; position++) {
         const matchId = this.matches.length + 1;
         this.matches.push({
@@ -186,32 +178,32 @@ export class TournamentService {
           player2Score: null,
           player1Legs: 0,
           player2Legs: 0,
-          isComplete: false
+          isComplete: false,
         });
       }
     }
-    
+
     // Get first round matches
-    const firstRoundMatches = this.matches.filter(m => m.round === 0);
-    
-    // Apply pairings to first round matches
+    const firstRoundMatches = this.matches.filter((m) => m.round === 0);
+
+    // Directly apply the pairings to the first round matches
     pairings.forEach((pair, index) => {
       if (index < firstRoundMatches.length) {
         const match = firstRoundMatches[index];
-        
+
         // Find player IDs by name
         if (pair.player1) {
-          const player1 = this.players.find(p => p.name === pair.player1);
+          const player1 = this.players.find((p) => p.name === pair.player1);
           if (player1) match.player1Id = player1.id;
         }
-        
+
         if (pair.player2) {
-          const player2 = this.players.find(p => p.name === pair.player2);
+          const player2 = this.players.find((p) => p.name === pair.player2);
           if (player2) match.player2Id = player2.id;
         }
       }
     });
-    
+
     // Process first round matches - complete matches with byes
     for (const match of firstRoundMatches) {
       // If there's only one player (bye), advance them automatically
@@ -221,7 +213,7 @@ export class TournamentService {
         match.player2Score = 0;
         match.player1Legs = Math.ceil(this.bestOfLegs / 2);
         match.isComplete = true;
-        
+
         // Record match history for first round bye
         this.matchHistory.push({
           matchId: match.id,
@@ -233,19 +225,18 @@ export class TournamentService {
           player2Legs: 0,
           winnerName: this.getPlayerName(match.player1Id),
           timestamp: new Date(),
-          gameMode: this.gameMode
+          gameMode: this.gameMode,
         });
-        
+
         // Advance the player to next round
         this.advancePlayerToNextRound(match);
-      } 
-      else if (match.player1Id === null && match.player2Id !== null) {
+      } else if (match.player1Id === null && match.player2Id !== null) {
         match.winner = match.player2Id;
         match.player1Score = 0;
         match.player2Score = this.getInitialScore();
         match.player2Legs = Math.ceil(this.bestOfLegs / 2);
         match.isComplete = true;
-        
+
         // Record match history for first round bye
         this.matchHistory.push({
           matchId: match.id,
@@ -257,14 +248,125 @@ export class TournamentService {
           player2Legs: match.player2Legs,
           winnerName: this.getPlayerName(match.player2Id),
           timestamp: new Date(),
-          gameMode: this.gameMode
+          gameMode: this.gameMode,
         });
-        
+
         // Advance the player to next round
         this.advancePlayerToNextRound(match);
       }
     }
-    
+
+    // Save match history to localStorage
+    this.saveToLocalStorage();
+
+    // Start the tournament
+    this.isStarted = true;
+    this.findNextMatch();
+  }
+
+  // New method to create brackets from explicit pairings
+  generateBracketFromPairings(pairings: Pairing[]): void {
+    const playerCount = this.players.length;
+
+    // Find the smallest power of 2 that can accommodate all pairs
+    const rounds = Math.ceil(Math.log2(pairings.length * 2));
+
+    // Initialize all matches
+    this.matches = [];
+    for (let round = 0; round < rounds; round++) {
+      const matchesInRound = Math.pow(2, rounds - round - 1);
+
+      for (let position = 0; position < matchesInRound; position++) {
+        const matchId = this.matches.length + 1;
+        this.matches.push({
+          id: matchId,
+          round,
+          position,
+          player1Id: null,
+          player2Id: null,
+          winner: null,
+          player1Score: null,
+          player2Score: null,
+          player1Legs: 0,
+          player2Legs: 0,
+          isComplete: false,
+        });
+      }
+    }
+
+    // Get first round matches
+    const firstRoundMatches = this.matches.filter((m) => m.round === 0);
+
+    // Apply pairings to first round matches
+    pairings.forEach((pair, index) => {
+      if (index < firstRoundMatches.length) {
+        const match = firstRoundMatches[index];
+
+        // Find player IDs by name
+        if (pair.player1) {
+          const player1 = this.players.find((p) => p.name === pair.player1);
+          if (player1) match.player1Id = player1.id;
+        }
+
+        if (pair.player2) {
+          const player2 = this.players.find((p) => p.name === pair.player2);
+          if (player2) match.player2Id = player2.id;
+        }
+      }
+    });
+
+    // Process first round matches - complete matches with byes
+    for (const match of firstRoundMatches) {
+      // If there's only one player (bye), advance them automatically
+      if (match.player1Id !== null && match.player2Id === null) {
+        match.winner = match.player1Id;
+        match.player1Score = this.getInitialScore();
+        match.player2Score = 0;
+        match.player1Legs = Math.ceil(this.bestOfLegs / 2);
+        match.isComplete = true;
+
+        // Record match history for first round bye
+        this.matchHistory.push({
+          matchId: match.id,
+          player1Name: this.getPlayerName(match.player1Id),
+          player2Name: 'Bye',
+          player1Score: match.player1Score,
+          player2Score: 0,
+          player1Legs: match.player1Legs,
+          player2Legs: 0,
+          winnerName: this.getPlayerName(match.player1Id),
+          timestamp: new Date(),
+          gameMode: this.gameMode,
+        });
+
+        // Advance the player to next round
+        this.advancePlayerToNextRound(match);
+      } else if (match.player1Id === null && match.player2Id !== null) {
+        match.winner = match.player2Id;
+        match.player1Score = 0;
+        match.player2Score = this.getInitialScore();
+        match.player2Legs = Math.ceil(this.bestOfLegs / 2);
+        match.isComplete = true;
+
+        // Record match history for first round bye
+        this.matchHistory.push({
+          matchId: match.id,
+          player1Name: 'Bye',
+          player2Name: this.getPlayerName(match.player2Id),
+          player1Score: 0,
+          player2Score: match.player2Score,
+          player1Legs: 0,
+          player2Legs: match.player2Legs,
+          winnerName: this.getPlayerName(match.player2Id),
+          timestamp: new Date(),
+          gameMode: this.gameMode,
+        });
+
+        // Advance the player to next round
+        this.advancePlayerToNextRound(match);
+      }
+    }
+
     // Save match history to localStorage
     this.saveToLocalStorage();
   }
@@ -299,19 +401,21 @@ export class TournamentService {
   // Update to generateBracket to respect player order
   generateBracket(preserveOrder: boolean = false): void {
     const playerCount = this.players.length;
-    
+
     // Find the smallest power of 2 that can accommodate all players
     const rounds = Math.ceil(Math.log2(playerCount));
     const totalSlots = Math.pow(2, rounds);
     const byes = totalSlots - playerCount;
-    
-    console.log(`Players: ${playerCount}, Rounds: ${rounds}, Total slots: ${totalSlots}, Byes: ${byes}`);
-    
+
+    console.log(
+      `Players: ${playerCount}, Rounds: ${rounds}, Total slots: ${totalSlots}, Byes: ${byes}`
+    );
+
     // Initialize all matches
     this.matches = [];
     for (let round = 0; round < rounds; round++) {
       const matchesInRound = Math.pow(2, rounds - round - 1);
-      
+
       for (let position = 0; position < matchesInRound; position++) {
         const matchId = this.matches.length + 1;
         this.matches.push({
@@ -325,40 +429,46 @@ export class TournamentService {
           player2Score: null,
           player1Legs: 0,
           player2Legs: 0,
-          isComplete: false
+          isComplete: false,
         });
       }
     }
-    
+
     // Get player IDs, shuffled or in original order
-    const playerIds = preserveOrder 
-      ? this.players.map(p => p.id)  // Keep original order
-      : this.shuffleArray(this.players.map(p => p.id));  // Shuffle
-    
+    const playerIds = preserveOrder
+      ? this.players.map((p) => p.id) // Keep original order
+      : this.shuffleArray(this.players.map((p) => p.id)); // Shuffle
+
     // Get first round matches
-    const firstRoundMatches = this.matches.filter(m => m.round === 0);
+    const firstRoundMatches = this.matches.filter((m) => m.round === 0);
     const firstRoundMatchCount = firstRoundMatches.length;
-    
+
     // Create seeded positions for players that guarantees no bye vs bye
-    const seedPositions = this.createSeedPositions(firstRoundMatchCount * 2, byes);
-    
+    const seedPositions = this.createSeedPositions(
+      firstRoundMatchCount * 2,
+      byes
+    );
+
     // Apply players to the seeded positions
     let playerIndex = 0;
     for (let i = 0; i < seedPositions.length; i++) {
-      if (seedPositions[i] === true) { // This position is a player, not a bye
+      if (seedPositions[i] === true) {
+        // This position is a player, not a bye
         if (playerIndex < playerIds.length) {
           const matchIndex = Math.floor(i / 2);
           const match = firstRoundMatches[matchIndex];
-          
-          if (i % 2 === 0) { // Player 1 position
+
+          if (i % 2 === 0) {
+            // Player 1 position
             match.player1Id = playerIds[playerIndex++];
-          } else { // Player 2 position
+          } else {
+            // Player 2 position
             match.player2Id = playerIds[playerIndex++];
           }
         }
       }
     }
-    
+
     // Process first round matches - complete matches with byes
     for (const match of firstRoundMatches) {
       // If there's only one player (bye), advance them automatically
@@ -368,7 +478,7 @@ export class TournamentService {
         match.player2Score = 0;
         match.player1Legs = Math.ceil(this.bestOfLegs / 2);
         match.isComplete = true;
-        
+
         // Record match history for first round bye
         this.matchHistory.push({
           matchId: match.id,
@@ -380,19 +490,18 @@ export class TournamentService {
           player2Legs: 0,
           winnerName: this.getPlayerName(match.player1Id),
           timestamp: new Date(),
-          gameMode: this.gameMode
+          gameMode: this.gameMode,
         });
-        
+
         // Advance the player to next round
         this.advancePlayerToNextRound(match);
-      } 
-      else if (match.player1Id === null && match.player2Id !== null) {
+      } else if (match.player1Id === null && match.player2Id !== null) {
         match.winner = match.player2Id;
         match.player1Score = 0;
         match.player2Score = this.getInitialScore();
         match.player2Legs = Math.ceil(this.bestOfLegs / 2);
         match.isComplete = true;
-        
+
         // Record match history for first round bye
         this.matchHistory.push({
           matchId: match.id,
@@ -404,14 +513,14 @@ export class TournamentService {
           player2Legs: match.player2Legs,
           winnerName: this.getPlayerName(match.player2Id),
           timestamp: new Date(),
-          gameMode: this.gameMode
+          gameMode: this.gameMode,
         });
-        
+
         // Advance the player to next round
         this.advancePlayerToNextRound(match);
       }
     }
-    
+
     // Save match history to localStorage
     this.saveToLocalStorage();
   }
@@ -426,80 +535,85 @@ export class TournamentService {
     return newArray;
   }
 
-// This is the key method to prevent bye vs bye matches
-// It creates a binary array where true = player position, false = bye position
-private createSeedPositions(totalPositions: number, byeCount: number): boolean[] {
-  // Create array with all positions as players
-  const positions = Array(totalPositions).fill(true);
-  
-  if (byeCount === 0) {
-    return positions; // No byes needed
-  }
-  
-  // Use a power-of-two-based approach to distribute byes
-  // This ensures we never have bye vs bye matches
-  
-  // Generate the seed positions in the correct order (1-indexed)
-  const seedOrder: number[] = [];
-  
-  // Helper function to generate the seeding order recursively
-  const generateOrder = (start: number, end: number): void => {
-    if (start > end) return;
-    
-    const mid = Math.floor((start + end) / 2);
-    seedOrder.push(mid);
-    
-    generateOrder(start, mid - 1);
-    generateOrder(mid + 1, end);
-  };
-  
-  generateOrder(1, totalPositions);
-  
-  // Mark the bye positions based on the seeding order
-  // Place byes at the highest seeds first
-  for (let i = 0; i < byeCount; i++) {
-    // Convert 1-indexed seed to 0-indexed position
-    const position = seedOrder[i] - 1;
-    positions[position] = false; // This position is now a bye
-  }
-  
-  // Crucial step: Ensure no bye vs bye matches
-  for (let i = 0; i < totalPositions; i += 2) {
-    if (!positions[i] && !positions[i + 1]) {
-      // Found a bye vs bye match - fix it by moving one bye
-      // Find the next match with two players and make one a bye
-      for (let j = 0; j < totalPositions; j += 2) {
-        if (positions[j] && positions[j + 1]) {
-          // Found a match with two players, make one a bye
-          positions[j] = false; // Convert to a bye
-          positions[i] = true;  // Convert back to a player
-          break;
+  // This is the key method to prevent bye vs bye matches
+  // It creates a binary array where true = player position, false = bye position
+  private createSeedPositions(
+    totalPositions: number,
+    byeCount: number
+  ): boolean[] {
+    // Create array with all positions as players
+    const positions = Array(totalPositions).fill(true);
+
+    if (byeCount === 0) {
+      return positions; // No byes needed
+    }
+
+    // Use a power-of-two-based approach to distribute byes
+    // This ensures we never have bye vs bye matches
+
+    // Generate the seed positions in the correct order (1-indexed)
+    const seedOrder: number[] = [];
+
+    // Helper function to generate the seeding order recursively
+    const generateOrder = (start: number, end: number): void => {
+      if (start > end) return;
+
+      const mid = Math.floor((start + end) / 2);
+      seedOrder.push(mid);
+
+      generateOrder(start, mid - 1);
+      generateOrder(mid + 1, end);
+    };
+
+    generateOrder(1, totalPositions);
+
+    // Mark the bye positions based on the seeding order
+    // Place byes at the highest seeds first
+    for (let i = 0; i < byeCount; i++) {
+      // Convert 1-indexed seed to 0-indexed position
+      const position = seedOrder[i] - 1;
+      positions[position] = false; // This position is now a bye
+    }
+
+    // Crucial step: Ensure no bye vs bye matches
+    for (let i = 0; i < totalPositions; i += 2) {
+      if (!positions[i] && !positions[i + 1]) {
+        // Found a bye vs bye match - fix it by moving one bye
+        // Find the next match with two players and make one a bye
+        for (let j = 0; j < totalPositions; j += 2) {
+          if (positions[j] && positions[j + 1]) {
+            // Found a match with two players, make one a bye
+            positions[j] = false; // Convert to a bye
+            positions[i] = true; // Convert back to a player
+            break;
+          }
         }
       }
     }
-  }
-  
-  // Double-check to make sure we have the right number of byes
-  const finalByeCount = positions.filter(p => !p).length;
-  if (finalByeCount !== byeCount) {
-    console.error(`Bye count mismatch: expected ${byeCount}, got ${finalByeCount}`);
-  }
-  
-  return positions;
-}
 
-// Helper method to check if the bracket has any bye vs bye matches
-private hasByeVsByeMatch(): boolean {
-  const firstRoundMatches = this.matches.filter(m => m.round === 0);
-  
-  for (const match of firstRoundMatches) {
-    if (match.player1Id === null && match.player2Id === null) {
-      return true;
+    // Double-check to make sure we have the right number of byes
+    const finalByeCount = positions.filter((p) => !p).length;
+    if (finalByeCount !== byeCount) {
+      console.error(
+        `Bye count mismatch: expected ${byeCount}, got ${finalByeCount}`
+      );
     }
+
+    return positions;
   }
-  
-  return false;
-}
+
+  // Helper method to check if the bracket has any bye vs bye matches
+  private hasByeVsByeMatch(): boolean {
+    const firstRoundMatches = this.matches.filter((m) => m.round === 0);
+
+    for (const match of firstRoundMatches) {
+      if (match.player1Id === null && match.player2Id === null) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 
   findNextMatch(): void {
     const incompleteMatches = this.matches

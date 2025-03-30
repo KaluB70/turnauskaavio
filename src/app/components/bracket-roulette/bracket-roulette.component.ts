@@ -120,9 +120,9 @@ interface PlayerPair {
               <div class="player-card flex-1 p-3 rounded-md" 
                    [class.bg-gray-100]="!pair.locked"
                    [class.bg-blue-50]="pair.locked && pair.player1">
-                <span *ngIf="pair.player1" class="text-lg">{{ pair.player1.name }}</span>
-                <span *ngIf="!pair.player1 && pair.locked" class="text-gray-500 text-lg">Bye</span>
-                <span *ngIf="!pair.player1 && !pair.locked" class="text-gray-600 text-lg">
+                <span *ngIf="pair.player1">{{ pair.player1.name }}</span>
+                <span *ngIf="!pair.player1 && pair.locked" class="text-gray-500">Bye</span>
+                <span *ngIf="!pair.player1 && !pair.locked" class="text-gray-600">
                   <span class="inline-block name-roll" [style.animation-duration.ms]="getAnimationSpeed(i, 0)">
                     {{ getRollingName(i, 0) }}
                   </span>
@@ -134,9 +134,9 @@ interface PlayerPair {
               <div class="player-card flex-1 p-3 rounded-md text-right" 
                    [class.bg-gray-100]="!pair.locked"
                    [class.bg-blue-50]="pair.locked && pair.player2">
-                <span *ngIf="pair.player2" class="text-lg">{{ pair.player2.name }}</span>
-                <span *ngIf="!pair.player2 && pair.locked" class="text-gray-500 text-lg">Bye</span>
-                <span *ngIf="!pair.player2 && !pair.locked" class="text-gray-600 text-lg">
+                <span *ngIf="pair.player2">{{ pair.player2.name }}</span>
+                <span *ngIf="!pair.player2 && pair.locked" class="text-gray-500">Bye</span>
+                <span *ngIf="!pair.player2 && !pair.locked" class="text-gray-600">
                   <span class="inline-block name-roll" [style.animation-duration.ms]="getAnimationSpeed(i, 1)"
                         [class.slowing-down]="isSlowingDown(i)">
                     {{ getRollingName(i, 1) }}
@@ -180,18 +180,60 @@ export class BracketRouletteComponent implements OnInit {
   private confettiInterval: any;
   private rollingNames: { [key: string]: string[] } = {}; // Store rolling names for each slot
   private rollingInterval: any;
+  private drumrollAudio: HTMLAudioElement | null = null;
   
   constructor(private tournamentService: TournamentService) {}
   
   ngOnInit(): void {
+    // Start audio at normal speed
+    this.initAudio();
+    this.playDrumroll(1.0);
     this.startRouletteAnimation();
   }
   
-  startRouletteAnimation(): void {
-    // Create empty pairs based on number of players
-    const pairCount = Math.ceil(this.players.length / 2);
+  initAudio(): void {
+    // Create the audio element
+    this.drumrollAudio = new Audio();
+    this.drumrollAudio.src = 'assets/sounds/drumroll.mp3'; // You'll need to add this file
+    this.drumrollAudio.loop = true;
+    this.drumrollAudio.volume = 0.7;
+    this.drumrollAudio.playbackRate = 1.0;
     
-    // Initialize empty pairs
+    // Preload the audio
+    this.drumrollAudio.load();
+  }
+  
+  playDrumroll(speed: number = 1.0): void {
+    if (this.drumrollAudio) {
+      this.drumrollAudio.playbackRate = speed;
+      
+      // If not already playing, start it
+      if (this.drumrollAudio.paused) {
+        this.drumrollAudio.play().catch(error => {
+          console.warn('Audio playback failed:', error);
+        });
+      }
+    }
+  }
+  
+  stopDrumroll(): void {
+    if (this.drumrollAudio && !this.drumrollAudio.paused) {
+      this.drumrollAudio.pause();
+      this.drumrollAudio.currentTime = 0;
+    }
+  }
+  
+  startRouletteAnimation(): void {
+    // Calculate the number of pairs needed (power of 2)
+    const playerCount = this.players.length;
+    const rounds = Math.ceil(Math.log2(playerCount));
+    const totalSlots = Math.pow(2, rounds);
+    const pairCount = totalSlots / 2; // Always a power of 2
+    const byeCount = totalSlots - playerCount;
+    
+    console.log(`Players: ${playerCount}, Pairs needed: ${pairCount}, Byes: ${byeCount}`);
+    
+    // Initialize empty pairs - always use the power of 2 count
     for (let i = 0; i < pairCount; i++) {
       this.playerPairs.push({
         player1: null,
@@ -300,19 +342,30 @@ export class BracketRouletteComponent implements OnInit {
     }
   }
   
+  ngOnDestroy(): void {
+    this.stopConfetti();
+    this.stopDrumroll();
+  }
+  
   assignPlayersAnimation(): void {
+    let pairIndex = 0;
+    this.playDrumroll(1.20 + (pairIndex * 0.25));
     this.currentStep = 'Luodaan otteluparit';
     this.currentAction = 'Valitaan pelaajat otteluihin...';
     
     // Shuffle player array for random pairings
     const shuffledPlayers = [...this.players].sort(() => Math.random() - 0.5);
     
-    // Calculate the correct distribution of byes
-    const totalSlots = this.playerPairs.length * 2;
+    // Calculate total slots (power of 2)
+    const rounds = Math.ceil(Math.log2(this.players.length));
+    const totalSlots = Math.pow(2, rounds);
     const byeCount = totalSlots - shuffledPlayers.length;
     
+    // Create seeded positions for players that guarantees optimal bye distribution
+    // true = player position, false = bye position
+    const seedPositions = this.createSeedPositions(totalSlots, byeCount);
+    
     // Begin locking pairs one by one with delay
-    let pairIndex = 0;
     let playerIndex = 0;
     
     // Processes each pair sequentially with delays between steps
@@ -328,44 +381,48 @@ export class BracketRouletteComponent implements OnInit {
       // First, highlight that we're working on this pair
       this.currentAction = `Arvotaan ottelua ${pairIndex + 1}...`;
       
-      // Determine if this pair should have a bye
-      const firstPlayerIsBye = this.shouldPlaceBye(pairIndex, 0, byeCount, this.playerPairs.length);
-      const secondPlayerIsBye = this.shouldPlaceBye(pairIndex, 1, byeCount, this.playerPairs.length);
+      // Speed up the audio as we're about to lock a pair
+      this.playDrumroll(1.0 + (pairIndex * 0.15));
+      
+      // Get seed positions for this pair
+      const pos1 = pairIndex * 2;
+      const pos2 = pairIndex * 2 + 1;
+      
+      // Determine if positions should be players or byes
+      const pos1IsBye = !seedPositions[pos1];
+      const pos2IsBye = !seedPositions[pos2];
+      
+      // Assign players to positions that should have players
+      if (!pos1IsBye && playerIndex < shuffledPlayers.length) {
+        pair.player1 = shuffledPlayers[playerIndex++];
+      }
+      
+      if (!pos2IsBye && playerIndex < shuffledPlayers.length) {
+        pair.player2 = shuffledPlayers[playerIndex++];
+      }
       
       // Force the correct names to appear in the rolling display during slowdown
       const key1 = `${pairIndex}-0`;
       const key2 = `${pairIndex}-1`;
       
-      // Prepare player assignments
-      let player1 = !firstPlayerIsBye && playerIndex < shuffledPlayers.length ? 
-          shuffledPlayers[playerIndex] : null;
-      let player2 = !secondPlayerIsBye && (playerIndex + (!firstPlayerIsBye ? 1 : 0)) < shuffledPlayers.length ? 
-          shuffledPlayers[playerIndex + (!firstPlayerIsBye ? 1 : 0)] : null;
-      
-      // Slowdown animation phase (3 seconds)
-      if (player1) {
-        this.rollingNames[key1] = [player1.name, ...this.rollingNames[key1].filter(n => n !== player1.name)];
+            // Slowdown animation phase (3 seconds)
+      if (pair.player1) {
+        this.rollingNames[key1] = [pair.player1.name, ...this.rollingNames[key1].filter(n => n !== pair.player1?.name)];
       } else {
         this.rollingNames[key1] = ["Bye", ...this.rollingNames[key1].filter(n => n !== "Bye")];
       }
       
-      if (player2) {
-        this.rollingNames[key2] = [player2.name, ...this.rollingNames[key2].filter(n => n !== player2.name)];
+      if (pair.player2) {
+        this.rollingNames[key2] = [pair.player2.name, ...this.rollingNames[key2].filter(n => n !== pair.player2?.name)];
       } else {
         this.rollingNames[key2] = ["Bye", ...this.rollingNames[key2].filter(n => n !== "Bye")];
       }
       
+      // Further increase audio speed during the final locking moments
+      this.playDrumroll(1.20 + (pairIndex * 0.25));
+      
       // After slowdown, lock in the players (3 seconds)
       setTimeout(() => {
-        // Assign players or byes to the pair
-        if (!firstPlayerIsBye && playerIndex < shuffledPlayers.length) {
-          pair.player1 = shuffledPlayers[playerIndex++];
-        }
-        
-        if (!secondPlayerIsBye && playerIndex < shuffledPlayers.length) {
-          pair.player2 = shuffledPlayers[playerIndex++];
-        }
-        
         // Lock the pair with dramatic pause
         pair.locked = true;
         this.currentAction = `Lukittu ottelu ${pairIndex + 1}!`;
@@ -380,6 +437,58 @@ export class BracketRouletteComponent implements OnInit {
     
     // Start the sequential locking
     setTimeout(() => lockNextPair(), 1000);
+  }
+  
+  // Creates optimal seed positions to ensure no bye vs bye
+  createSeedPositions(totalPositions: number, byeCount: number): boolean[] {
+    // Create array with all positions as players
+    const positions = Array(totalPositions).fill(true);
+    
+    if (byeCount === 0) {
+      return positions; // No byes needed
+    }
+    
+    // Generate the seed positions in the correct order (1-indexed)
+    const seedOrder: number[] = [];
+    
+    // Helper function to generate the seeding order recursively
+    const generateOrder = (start: number, end: number): void => {
+      if (start > end) return;
+      
+      const mid = Math.floor((start + end) / 2);
+      seedOrder.push(mid);
+      
+      generateOrder(start, mid - 1);
+      generateOrder(mid + 1, end);
+    };
+    
+    generateOrder(1, totalPositions);
+    
+    // Mark the bye positions based on the seeding order
+    // Place byes at the highest seeds first
+    for (let i = 0; i < byeCount; i++) {
+      // Convert 1-indexed seed to 0-indexed position
+      const position = seedOrder[i] - 1;
+      positions[position] = false; // This position is now a bye
+    }
+    
+    // Crucial step: Ensure no bye vs bye matches
+    for (let i = 0; i < totalPositions; i += 2) {
+      if (!positions[i] && !positions[i + 1]) {
+        // Found a bye vs bye match - fix it by moving one bye
+        // Find the next match with two players and make one a bye
+        for (let j = 0; j < totalPositions; j += 2) {
+          if (positions[j] && positions[j + 1]) {
+            // Found a match with two players, make one a bye
+            positions[j] = false; // Convert to a bye
+            positions[i] = true;  // Convert back to a player
+            break;
+          }
+        }
+      }
+    }
+    
+    return positions;
   }
   
   shouldPlaceBye(pairIndex: number, position: number, byeCount: number, totalPairs: number): boolean {
@@ -401,8 +510,20 @@ export class BracketRouletteComponent implements OnInit {
     this.currentAction = 'Kaikki pelaajat arvottu paikoilleen.';
     this.allPairsLocked = true;
     
+    // Stop the drumroll and play a success sound
+    this.stopDrumroll();
+    this.playSuccessSound();
+    
     // Stop the confetti animation
     this.stopConfetti();
+  }
+  
+  playSuccessSound(): void {
+    const successAudio = new Audio('assets/sounds/success.mp3');
+    successAudio.volume = 0.7;
+    successAudio.play().catch(error => {
+      console.warn('Audio playback failed:', error);
+    });
   }
   
   onStartTournament(): void {
