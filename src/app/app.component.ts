@@ -8,6 +8,7 @@ import { CurrentMatchComponent } from './components/current-match/current-match.
 import { MatchHistoryComponent } from './components/match-history/match-history.component';
 import { VictoryAnimationComponent } from './components/victory-animation/victory-animation.component';
 import { TournamentWinnersComponent } from './components/tournament-winners/tournament-winners.component';
+import { BracketRouletteComponent } from './components/bracket-roulette/bracket-roulette.component';
 import { TournamentService } from './services/tournament.service';
 
 @Component({
@@ -21,7 +22,8 @@ import { TournamentService } from './services/tournament.service';
     CurrentMatchComponent,
     MatchHistoryComponent,
     VictoryAnimationComponent,
-    TournamentWinnersComponent
+    TournamentWinnersComponent,
+    BracketRouletteComponent
   ],
   template: `
     <div class="container mx-auto px-4 py-8">

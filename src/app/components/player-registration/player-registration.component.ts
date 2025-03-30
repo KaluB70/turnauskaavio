@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TournamentService, GameMode } from '../../services/tournament.service';
 import { HideSelectedPipe } from "./hide-selected.pipe";
+import { BracketRouletteComponent } from '../bracket-roulette/bracket-roulette.component';
 
 const RECENT_PLAYERS_KEY = 'darts_recent_players';
 const MAX_RECENT_PLAYERS = 15;
@@ -11,9 +12,9 @@ const MAX_RECENT_PLAYERS = 15;
 @Component({
   selector: 'player-registration',
   standalone: true,
-  imports: [CommonModule, FormsModule, HideSelectedPipe],
+  imports: [CommonModule, FormsModule, HideSelectedPipe, BracketRouletteComponent],
   template: `
-    <div class="bg-gray-100 p-6 rounded-lg shadow">
+    <div *ngIf="!showBracketRoulette" class="bg-gray-100 p-6 rounded-lg shadow">
       <h2 class="text-xl font-semibold mb-4">Turnausmuoto</h2>
       
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -120,7 +121,7 @@ const MAX_RECENT_PLAYERS = 15;
       
       <div class="mt-6 flex space-x-3">
         <button 
-          (click)="startTournament()" 
+          (click)="startBracketRoulette()" 
           class="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700"
           [disabled]="(addedPlayers.length < 2)">
           Aloita Turnaus
@@ -138,6 +139,15 @@ const MAX_RECENT_PLAYERS = 15;
         </div>
       </div>
     </div>
+    
+    <!-- Bracket Roulette Animation -->
+    <bracket-roulette
+      *ngIf="showBracketRoulette"
+      [players]="preparedPlayers"
+      [gameMode]="selectedGameMode"
+      [bestOfLegs]="selectedBestOf"
+      (tournamentReady)="onTournamentReady()">
+    </bracket-roulette>
   `
 })
 export class PlayerRegistrationComponent implements OnInit {
@@ -153,6 +163,10 @@ export class PlayerRegistrationComponent implements OnInit {
   
   recentPlayers: string[] = [];
   filteredSuggestions: string[] = [];
+  
+  // New properties for bracket roulette
+  showBracketRoulette = false;
+  preparedPlayers: { id: number; name: string }[] = [];
   
   @ViewChild('playerNameInput') playerNameInput!: ElementRef;
   
@@ -279,13 +293,53 @@ export class PlayerRegistrationComponent implements OnInit {
     return `${baseClass} bg-gray-200 text-gray-800 hover:bg-gray-300`;
   }
   
+  // New method to start the bracket roulette animation
+  startBracketRoulette(): void {
+    try {
+      this.errorMessage = '';
+    
+      const playerNames: string[] = [...this.addedPlayers];
+    
+      if (playerNames.length < 2) {
+        this.errorMessage = 'Please enter at least 2 player names.';
+        return;
+      }
+      
+      // Save all player names to recent players
+      playerNames.forEach(name => this.addToRecentPlayers(name));
+      
+      // Prepare players for the roulette
+      this.preparedPlayers = playerNames.map((name, index) => ({
+        id: index + 1,
+        name: name.trim()
+      }));
+      
+      // Show the bracket roulette component
+      this.showBracketRoulette = true;
+      
+      // Set the tournament mode settings
+      this.tournamentService.gameMode = this.selectedGameMode;
+      this.tournamentService.bestOfLegs = this.selectedBestOf;
+      
+    } catch (error) {
+      this.errorMessage = (error as Error).message;
+    }
+  }
+  
+  // Called when tournament is ready to start after animation
+  onTournamentReady(): void {
+    // No need to do anything here as the BracketRouletteComponent
+    // will handle starting the tournament
+    this.showBracketRoulette = false;
+  }
+  
+  // Original start tournament method (now replaced by roulette)
   startTournament(): void {
     try {
       this.errorMessage = '';
     
       const playerNames: string[] = [...this.addedPlayers];
     
-      
       if (playerNames.length < 2) {
         this.errorMessage = 'Please enter at least 2 player names.';
         return;

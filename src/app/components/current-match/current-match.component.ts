@@ -28,7 +28,7 @@ import { MatchWinnerAnimationComponent } from '../match-winner-animation/match-w
         
         <div class="flex flex-col md:flex-row justify-between items-center mb-6">
           <div class="text-center w-full md:w-2/5 mb-4 md:mb-0">
-            <div class="font-bold text-lg">{{ tournamentService.getPlayerName(match.player1Id!) }}</div>
+            <div class="font-bold text-3xl">{{ tournamentService.getPlayerName(match.player1Id!) }}</div>
             
             <div class="mt-4 mb-3">
               <div class="text-2xl font-bold">Legit: {{ match.player1Legs }}</div>
@@ -53,7 +53,7 @@ import { MatchWinnerAnimationComponent } from '../match-winner-animation/match-w
           <div class="text-3xl font-bold mb-4 md:mb-0">vs</div>
           
           <div class="text-center w-full md:w-2/5">
-            <div class="font-bold text-lg">{{ tournamentService.getPlayerName(match.player2Id!) }}</div>
+            <div class="font-bold text-3xl">{{ tournamentService.getPlayerName(match.player2Id!) }}</div>
             
             <div class="mt-4 mb-3">
               <div class="text-2xl font-bold">Legit: {{ match.player2Legs }}</div>
