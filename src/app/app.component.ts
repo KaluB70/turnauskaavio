@@ -1,14 +1,13 @@
 // app.component.ts
-import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BracketComponent } from './components/bracket/bracket.component';
-import { PlayerRegistrationComponent } from './components/player-registration/player-registration.component';
 import { CurrentMatchComponent } from './components/current-match/current-match.component';
 import { MatchHistoryComponent } from './components/match-history/match-history.component';
-import { VictoryAnimationComponent } from './components/victory-animation/victory-animation.component';
+import { PlayerRegistrationComponent } from './components/player-registration/player-registration.component';
 import { TournamentWinnersComponent } from './components/tournament-winners/tournament-winners.component';
-import { BracketRouletteComponent } from './components/bracket-roulette/bracket-roulette.component';
+import { VictoryAnimationComponent } from './components/victory-animation/victory-animation.component';
 import { TournamentService } from './services/tournament.service';
 
 @Component({
@@ -22,8 +21,7 @@ import { TournamentService } from './services/tournament.service';
     CurrentMatchComponent,
     MatchHistoryComponent,
     VictoryAnimationComponent,
-    TournamentWinnersComponent,
-    BracketRouletteComponent
+    TournamentWinnersComponent
   ],
   template: `
     <div class="container mx-auto px-4 py-8">
