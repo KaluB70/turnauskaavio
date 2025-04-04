@@ -156,10 +156,10 @@ export class PlayerRegistrationComponent implements OnInit {
   errorMessage = '';
   
   gameModes: GameMode[] = ['301', '501', '701', 'Cricket'];
-  selectedGameMode: GameMode = '501';
+  selectedGameMode: GameMode = '301';
   
   bestOfOptions = [1, 3, 5, 7, 9, 11];
-  selectedBestOf = 3;
+  selectedBestOf = 1;
   
   recentPlayers: string[] = [];
   filteredSuggestions: string[] = [];
