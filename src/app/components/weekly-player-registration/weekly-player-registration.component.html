@@ -11,7 +11,7 @@
           id="weekNumber"
           class="w-full p-2 border border-gray-300 rounded-md"
           [(ngModel)]="weekNumber"
-          min="1"
+          [min]="initialWeekNumber"
           max="10"
           placeholder="Viikko numero (1-10)">
       </div>

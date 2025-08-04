@@ -15,24 +15,25 @@ import { WeeklyMatchWinnerComponent } from '../weekly-match-winner/weekly-match-
 
       <!-- Match Winner Animation -->
       <weekly-match-winner
-        *ngIf="weeklyTournamentService.showMatchWinnerAnimation"
-        [winnerName]="weeklyTournamentService.lastWinnerName">
+          *ngIf="weeklyTournamentService.showMatchWinnerAnimation"
+          [winnerName]="weeklyTournamentService.lastWinnerName">
       </weekly-match-winner>
 
       <div *ngIf="weeklyTournamentService.currentMatch; let match">
         <div class="mb-4 text-center">
-          <span class="text-sm bg-blue-600 text-white py-1 px-3 rounded-full">
-            {{ weeklyTournamentService.getRoundForMatch(match) }}
-          </span>
+		  <span class="text-sm bg-blue-600 text-white py-1 px-3 rounded-full">
+			{{ weeklyTournamentService.getRoundForMatch(match) }}
+		  </span>
           <span class="ml-2 text-sm bg-green-600 text-white py-1 px-3 rounded-full">
-            BO{{ getEffectiveBestOf(match) }}
-          </span>
+			BO{{ getEffectiveBestOf(match) }}
+		  </span>
           <span class="ml-2 text-sm bg-purple-600 text-white py-1 px-3 rounded-full">
-            {{ weeklyTournamentService.gameMode }}
-          </span>
-          <span *ngIf="weeklyTournamentService.isPlayoffMatch(match)" class="ml-2 text-sm bg-red-600 text-white py-1 px-3 rounded-full">
-            KARSINTA
-          </span>
+			{{ weeklyTournamentService.gameMode }}
+		  </span>
+          <span *ngIf="weeklyTournamentService.isPlayoffMatch(match)"
+                class="ml-2 text-sm bg-red-600 text-white py-1 px-3 rounded-full">
+			KARSINTA
+		  </span>
         </div>
 
         <!-- 3-way Final Display -->
@@ -49,14 +50,14 @@ import { WeeklyMatchWinnerComponent } from '../weekly-match-winner/weekly-match-
               <div class="text-lg font-bold mb-3">Legit: {{ match.player1Legs }}</div>
               <div class="flex justify-center space-x-2">
                 <button
-                  (click)="decreasePlayer1Legs()"
-                  class="bg-gray-200 text-gray-800 py-1 px-3 rounded-md hover:bg-gray-300 font-bold"
-                  [disabled]="match.player1Legs <= 0">
+                    (click)="decreasePlayer1Legs()"
+                    class="bg-gray-200 text-gray-800 py-1 px-3 rounded-md hover:bg-gray-300 font-bold"
+                    [disabled]="match.player1Legs <= 0">
                   -
                 </button>
                 <button
-                  (click)="increasePlayer1Legs()"
-                  class="bg-blue-600 text-white py-1 px-3 rounded-md hover:bg-blue-700 font-bold">
+                    (click)="increasePlayer1Legs()"
+                    class="bg-blue-600 text-white py-1 px-3 rounded-md hover:bg-blue-700 font-bold">
                   +
                 </button>
               </div>
@@ -68,33 +69,34 @@ import { WeeklyMatchWinnerComponent } from '../weekly-match-winner/weekly-match-
               <div class="text-lg font-bold mb-3">Legit: {{ match.player2Legs }}</div>
               <div class="flex justify-center space-x-2">
                 <button
-                  (click)="decreasePlayer2Legs()"
-                  class="bg-gray-200 text-gray-800 py-1 px-3 rounded-md hover:bg-gray-300 font-bold"
-                  [disabled]="match.player2Legs <= 0">
+                    (click)="decreasePlayer2Legs()"
+                    class="bg-gray-200 text-gray-800 py-1 px-3 rounded-md hover:bg-gray-300 font-bold"
+                    [disabled]="match.player2Legs <= 0">
                   -
                 </button>
                 <button
-                  (click)="increasePlayer2Legs()"
-                  class="bg-blue-600 text-white py-1 px-3 rounded-md hover:bg-blue-700 font-bold">
+                    (click)="increasePlayer2Legs()"
+                    class="bg-blue-600 text-white py-1 px-3 rounded-md hover:bg-blue-700 font-bold">
                   +
                 </button>
               </div>
             </div>
 
             <!-- Player 3 -->
-            <div *ngIf="weeklyTournamentService.thirdFinalPlayer" class="text-center bg-white p-4 rounded-lg border-2 border-blue-300">
+            <div *ngIf="weeklyTournamentService.thirdFinalPlayer"
+                 class="text-center bg-white p-4 rounded-lg border-2 border-blue-300">
               <div class="font-bold text-xl mb-2">{{ weeklyTournamentService.thirdFinalPlayer.name }}</div>
               <div class="text-lg font-bold mb-3">Legit: {{ thirdPlayerLegs }}</div>
               <div class="flex justify-center space-x-2">
                 <button
-                  (click)="decreaseThirdPlayerLegs()"
-                  class="bg-gray-200 text-gray-800 py-1 px-3 rounded-md hover:bg-gray-300 font-bold"
-                  [disabled]="thirdPlayerLegs <= 0">
+                    (click)="decreaseThirdPlayerLegs()"
+                    class="bg-gray-200 text-gray-800 py-1 px-3 rounded-md hover:bg-gray-300 font-bold"
+                    [disabled]="thirdPlayerLegs <= 0">
                   -
                 </button>
                 <button
-                  (click)="increaseThirdPlayerLegs()"
-                  class="bg-blue-600 text-white py-1 px-3 rounded-md hover:bg-blue-700 font-bold">
+                    (click)="increaseThirdPlayerLegs()"
+                    class="bg-blue-600 text-white py-1 px-3 rounded-md hover:bg-blue-700 font-bold">
                   +
                 </button>
               </div>
@@ -103,7 +105,8 @@ import { WeeklyMatchWinnerComponent } from '../weekly-match-winner/weekly-match-
         </div>
 
         <!-- Regular 2-player Match Display -->
-        <div *ngIf="!weeklyTournamentService.is3WayFinal() || match.round !== 'final'" class="flex flex-col md:flex-row justify-between items-center mb-6">
+        <div *ngIf="!weeklyTournamentService.is3WayFinal() || match.round !== 'final'"
+             class="flex flex-col md:flex-row justify-between items-center mb-6">
           <div class="text-center w-full md:w-2/5 mb-4 md:mb-0">
             <div class="font-bold text-3xl">{{ weeklyTournamentService.getPlayerName(match.player1Id) }}</div>
 
@@ -113,14 +116,14 @@ import { WeeklyMatchWinnerComponent } from '../weekly-match-winner/weekly-match-
 
             <div class="flex justify-center items-center mt-4">
               <button
-                (click)="decreasePlayer1Legs()"
-                class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 mr-2 text-lg font-bold"
-                [disabled]="match.player1Legs <= 0">
+                  (click)="decreasePlayer1Legs()"
+                  class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 mr-2 text-lg font-bold"
+                  [disabled]="match.player1Legs <= 0">
                 -
               </button>
               <button
-                (click)="increasePlayer1Legs()"
-                class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 text-lg font-bold">
+                  (click)="increasePlayer1Legs()"
+                  class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 text-lg font-bold">
                 +
               </button>
             </div>
@@ -137,14 +140,14 @@ import { WeeklyMatchWinnerComponent } from '../weekly-match-winner/weekly-match-
 
             <div class="flex justify-center items-center mt-4">
               <button
-                (click)="decreasePlayer2Legs()"
-                class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 mr-2 text-lg font-bold"
-                [disabled]="match.player2Legs <= 0">
+                  (click)="decreasePlayer2Legs()"
+                  class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 mr-2 text-lg font-bold"
+                  [disabled]="match.player2Legs <= 0">
                 -
               </button>
               <button
-                (click)="increasePlayer2Legs()"
-                class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 text-lg font-bold">
+                  (click)="increasePlayer2Legs()"
+                  class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 text-lg font-bold">
                 +
               </button>
             </div>
@@ -156,7 +159,8 @@ import { WeeklyMatchWinnerComponent } from '../weekly-match-winner/weekly-match-
           <div class="text-sm text-gray-600 mb-2">
             Voittoon tarvitaan {{ getLegsToWin(match) }} legiä
           </div>
-          <div *ngIf="!weeklyTournamentService.is3WayFinal() || match.round !== 'final'" class="flex justify-center space-x-1">
+          <div *ngIf="!weeklyTournamentService.is3WayFinal() || match.round !== 'final'"
+               class="flex justify-center space-x-1">
             <div *ngFor="let i of getProgressDots(match.player1Legs, getLegsToWin(match))"
                  class="w-3 h-3 rounded-full"
                  [class.bg-blue-600]="i <= match.player1Legs"
@@ -208,11 +212,12 @@ import { WeeklyMatchWinnerComponent } from '../weekly-match-winner/weekly-match-
                   <span class="font-bold mr-2">{{ i + 1 }}.</span>
                   <span>{{ standing.playerName }}</span>
                   <span *ngIf="i < 3" class="ml-2 text-xs bg-green-600 text-white px-2 py-1 rounded-full">
-                    +{{ getWeeklyPoints(i + 1) }}p
-                  </span>
+					+{{ getWeeklyPoints(i + 1) }}p
+				  </span>
                 </div>
                 <div class="text-sm text-gray-600">
-                  {{ standing.wins }}V - {{ standing.losses }}T ({{ standing.legDifference >= 0 ? '+' : '' }}{{ standing.legDifference }})
+                  {{ standing.wins }}V - {{ standing.losses }}T
+                  ({{ standing.legDifference >= 0 ? '+' : '' }}{{ standing.legDifference }})
                 </div>
               </div>
             </div>
@@ -225,14 +230,14 @@ import { WeeklyMatchWinnerComponent } from '../weekly-match-winner/weekly-match-
 
           <div class="flex justify-center mt-6 space-x-4">
             <button
-              (click)="startNewTournament()"
-              class="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700">
+                (click)="startNewTournament()"
+                class="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700">
               Etusivu
             </button>
 
             <button
-              (click)="restartWithSamePlayers()"
-              class="bg-green-600 text-white py-2 px-6 rounded-md hover:bg-green-700">
+                (click)="restartWithSamePlayers()"
+                class="bg-green-600 text-white py-2 px-6 rounded-md hover:bg-green-700">
               Uusi viikko samoilla pelaajilla
             </button>
           </div>
@@ -244,8 +249,8 @@ import { WeeklyMatchWinnerComponent } from '../weekly-match-winner/weekly-match-
             {{ getPhaseTransitionMessage() }}
           </div>
           <button
-            (click)="continueToNextPhase()"
-            class="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700">
+              (click)="continueToNextPhase()"
+              class="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700">
             Jatka seuraavaan vaiheeseen
           </button>
         </div>
@@ -259,172 +264,172 @@ export class WeeklyCurrentMatchComponent {
   constructor(public weeklyTournamentService: WeeklyTournamentService) {}
 
   increasePlayer1Legs(): void {
-    if (!this.weeklyTournamentService.currentMatch) return;
-    this.weeklyTournamentService.currentMatch.player1Legs++;
-    this.checkForMatchCompletion();
+	if (!this.weeklyTournamentService.currentMatch) return;
+	this.weeklyTournamentService.currentMatch.player1Legs++;
+	this.checkForMatchCompletion();
   }
 
   decreasePlayer1Legs(): void {
-    if (!this.weeklyTournamentService.currentMatch || this.weeklyTournamentService.currentMatch.player1Legs <= 0) return;
-    this.weeklyTournamentService.currentMatch.player1Legs--;
+	if (!this.weeklyTournamentService.currentMatch || this.weeklyTournamentService.currentMatch.player1Legs <= 0) return;
+	this.weeklyTournamentService.currentMatch.player1Legs--;
   }
 
   increasePlayer2Legs(): void {
-    if (!this.weeklyTournamentService.currentMatch) return;
-    this.weeklyTournamentService.currentMatch.player2Legs++;
-    this.checkForMatchCompletion();
+	if (!this.weeklyTournamentService.currentMatch) return;
+	this.weeklyTournamentService.currentMatch.player2Legs++;
+	this.checkForMatchCompletion();
   }
 
   decreasePlayer2Legs(): void {
-    if (!this.weeklyTournamentService.currentMatch || this.weeklyTournamentService.currentMatch.player2Legs <= 0) return;
-    this.weeklyTournamentService.currentMatch.player2Legs--;
+	if (!this.weeklyTournamentService.currentMatch || this.weeklyTournamentService.currentMatch.player2Legs <= 0) return;
+	this.weeklyTournamentService.currentMatch.player2Legs--;
   }
 
   checkForMatchCompletion(): void {
-    if (!this.weeklyTournamentService.currentMatch) return;
+	if (!this.weeklyTournamentService.currentMatch) return;
 
-    const match = this.weeklyTournamentService.currentMatch;
-    const legsToWin = this.getLegsToWin(match);
+	const match = this.weeklyTournamentService.currentMatch;
+	const legsToWin = this.getLegsToWin(match);
 
-    // Check for 3-way final completion
-    if (this.weeklyTournamentService.is3WayFinal() && match.round === 'final') {
-      const legs = [match.player1Legs, match.player2Legs, this.thirdPlayerLegs];
-      const maxLegs = Math.max(...legs);
+	// Check for 3-way final completion
+	if (this.weeklyTournamentService.is3WayFinal() && match.round === 'final') {
+	  const legs = [match.player1Legs, match.player2Legs, this.thirdPlayerLegs];
+	  const maxLegs = Math.max(...legs);
 
-      if (maxLegs >= legsToWin) {
-        // Determine winner
-        let winnerId: number;
-        if (match.player1Legs === maxLegs) {
-          winnerId = match.player1Id;
-        } else if (match.player2Legs === maxLegs) {
-          winnerId = match.player2Id;
-        } else {
-          winnerId = this.weeklyTournamentService.thirdFinalPlayer!.id;
-        }
+	  if (maxLegs >= legsToWin) {
+		// Determine winner
+		let winnerId: number;
+		if (match.player1Legs === maxLegs) {
+		  winnerId = match.player1Id;
+		} else if (match.player2Legs === maxLegs) {
+		  winnerId = match.player2Id;
+		} else {
+		  winnerId = this.weeklyTournamentService.thirdFinalPlayer!.id;
+		}
 
-        this.weeklyTournamentService.completeMatch(winnerId);
-        return;
-      }
-    }
+		this.weeklyTournamentService.completeMatch(winnerId);
+		return;
+	  }
+	}
 
-    // Regular 2-player match completion
-    if (match.player1Legs >= legsToWin || match.player2Legs >= legsToWin) {
-      const winnerId = match.player1Legs >= legsToWin ? match.player1Id : match.player2Id;
-      this.weeklyTournamentService.completeMatch(winnerId);
-    }
+	// Regular 2-player match completion
+	if (match.player1Legs >= legsToWin || match.player2Legs >= legsToWin) {
+	  const winnerId = match.player1Legs >= legsToWin ? match.player1Id : match.player2Id;
+	  this.weeklyTournamentService.completeMatch(winnerId);
+	}
   }
 
   increaseThirdPlayerLegs(): void {
-    this.thirdPlayerLegs++;
-    this.checkForMatchCompletion();
+	this.thirdPlayerLegs++;
+	this.checkForMatchCompletion();
   }
 
   decreaseThirdPlayerLegs(): void {
-    if (this.thirdPlayerLegs <= 0) return;
-    this.thirdPlayerLegs--;
+	if (this.thirdPlayerLegs <= 0) return;
+	this.thirdPlayerLegs--;
   }
 
   getEffectiveBestOf(match: any): number {
-    // Playoff matches are BO1
-    if (this.weeklyTournamentService.isPlayoffMatch(match)) {
-      return 1;
-    }
-    return this.weeklyTournamentService.bestOfLegs;
+	// Playoff matches are BO1
+	if (this.weeklyTournamentService.isPlayoffMatch(match)) {
+	  return 1;
+	}
+	return this.weeklyTournamentService.bestOfLegs;
   }
 
   getLegsToWin(match: any): number {
-    const bestOf = this.getEffectiveBestOf(match);
-    return Math.ceil(bestOf / 2);
+	const bestOf = this.getEffectiveBestOf(match);
+	return Math.ceil(bestOf / 2);
   }
 
   getProgressDots(currentLegs: number, maxLegs: number): number[] {
-    return Array.from({ length: maxLegs }, (_, i) => i + 1);
+	return Array.from({ length: maxLegs }, (_, i) => i + 1);
   }
 
   getTournamentCompleteMessage(): string {
-    if (!this.weeklyTournamentService.isStarted) {
-      return 'Turnaus ei ole alkanut';
-    }
+	if (!this.weeklyTournamentService.isStarted) {
+	  return 'Turnaus ei ole alkanut';
+	}
 
-    if (this.isFullyComplete()) {
-      return 'Viikkokisat päättyneet!';
-    }
+	if (this.isFullyComplete()) {
+	  return 'Viikkokisat päättyneet!';
+	}
 
-    switch (this.weeklyTournamentService.currentPhase) {
-      case 'group':
-        return 'Lohkopelit päättyneet';
-      case 'playoff':
-        return 'Karsinnat päättyneet';
-      case 'final':
-        return 'Finaali päättynyt';
-      default:
-        return 'Vaihe päättynyt';
-    }
+	switch (this.weeklyTournamentService.currentPhase) {
+	  case 'group':
+		return 'Lohkopelit päättyneet';
+	  case 'playoff':
+		return 'Karsinnat päättyneet';
+	  case 'final':
+		return 'Finaali päättynyt';
+	  default:
+		return 'Vaihe päättynyt';
+	}
   }
 
   getPhaseTransitionMessage(): string {
-    switch (this.weeklyTournamentService.currentPhase) {
-      case 'group':
-        if (this.weeklyTournamentService.tournamentType === 'round-robin') {
-          return this.weeklyTournamentService.players.length === 3
-            ? 'Kaikki ottelut pelattu!'
-            : 'Karsinnat päättyneet - finalistit selvillä!';
-        }
-        return 'Lohkopelit päättyneet - siirtymässä karsintaan';
-      case 'playoff':
-        return 'Karsinta päättynyt - siirtymässä finaaliin';
-      default:
-        return '';
-    }
+	switch (this.weeklyTournamentService.currentPhase) {
+	  case 'group':
+		if (this.weeklyTournamentService.tournamentType === 'round-robin') {
+		  return this.weeklyTournamentService.players.length === 3
+			? 'Kaikki ottelut pelattu!'
+			: 'Karsinnat päättyneet - finalistit selvillä!';
+		}
+		return 'Lohkopelit päättyneet - siirtymässä karsintaan';
+	  case 'playoff':
+		return 'Karsinta päättynyt - siirtymässä finaaliin';
+	  default:
+		return '';
+	}
   }
 
   isFullyComplete(): boolean {
-    if (this.weeklyTournamentService.currentPhase === 'final' && !this.weeklyTournamentService.currentMatch) {
-      const finalMatches = this.weeklyTournamentService.matches.filter(m => m.round === 'final');
-      return finalMatches.length > 0 && finalMatches.every(m => m.isComplete);
-    }
+	if (this.weeklyTournamentService.currentPhase === 'final' && !this.weeklyTournamentService.currentMatch) {
+	  const finalMatches = this.weeklyTournamentService.matches.filter(m => m.round === 'final');
+	  return finalMatches.length > 0 && finalMatches.every(m => m.isComplete);
+	}
 
-    // For 3-player round robin, complete when all group matches are done
-    if (this.weeklyTournamentService.players.length === 3 &&
-      this.weeklyTournamentService.tournamentType === 'round-robin' &&
-      this.weeklyTournamentService.currentPhase === 'group' &&
-      !this.weeklyTournamentService.currentMatch) {
-      const groupMatches = this.weeklyTournamentService.matches.filter(m => m.round === 'group');
-      return groupMatches.length > 0 && groupMatches.every(m => m.isComplete);
-    }
+	// For 3-player round robin, complete when all group matches are done
+	if (this.weeklyTournamentService.players.length === 3 &&
+	  this.weeklyTournamentService.tournamentType === 'round-robin' &&
+	  this.weeklyTournamentService.currentPhase === 'group' &&
+	  !this.weeklyTournamentService.currentMatch) {
+	  const groupMatches = this.weeklyTournamentService.matches.filter(m => m.round === 'group');
+	  return groupMatches.length > 0 && groupMatches.every(m => m.isComplete);
+	}
 
-    return false;
+	return false;
   }
 
   getFinalResults(): any[] {
-    return this.weeklyTournamentService.getSortedStandings();
+	return this.weeklyTournamentService.getSortedStandings();
   }
 
   getWeeklyPoints(position: number): number {
-    switch (position) {
-      case 1: return 5;
-      case 2: return 3;
-      case 3: return 1;
-      default: return 0;
-    }
+	switch (position) {
+	  case 1: return 5;
+	  case 2: return 3;
+	  case 3: return 1;
+	  default: return 0;
+	}
   }
 
   continueToNextPhase(): void {
-    // This will trigger the phase transition logic
-    this.weeklyTournamentService.findNextMatch();
+	// This will trigger the phase transition logic
+	this.weeklyTournamentService.findNextMatch();
   }
 
   startNewTournament(): void {
-    this.weeklyTournamentService.resetTournament();
+	this.weeklyTournamentService.resetTournament();
   }
 
   restartWithSamePlayers(): void {
-    const playerNames = this.weeklyTournamentService.players.map(p => p.name);
-    const gameMode = this.weeklyTournamentService.gameMode;
-    const bestOfLegs = this.weeklyTournamentService.bestOfLegs;
-    const weekNumber = this.weeklyTournamentService.weekNumber + 1; // Next week
+	const playerNames = this.weeklyTournamentService.players.map(p => p.name);
+	const gameMode = this.weeklyTournamentService.gameMode;
+	const bestOfLegs = this.weeklyTournamentService.bestOfLegs;
+	const weekNumber = this.weeklyTournamentService.weekNumber + 1; // Next week
 
-    this.weeklyTournamentService.resetTournament();
-    this.weeklyTournamentService.registerPlayers(playerNames, gameMode, bestOfLegs, weekNumber);
+	this.weeklyTournamentService.resetTournament();
+	this.weeklyTournamentService.registerPlayers(playerNames, gameMode, bestOfLegs, weekNumber);
   }
 }

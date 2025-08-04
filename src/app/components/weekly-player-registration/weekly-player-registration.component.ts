@@ -18,12 +18,13 @@ export class WeeklyPlayerRegistrationComponent implements OnInit {
   currentPlayerName = '';
   addedPlayers: string[] = [];
   errorMessage = '';
+  initialWeekNumber = 1;
   weekNumber = 1;
 
-  gameModes: WeeklyGameMode[] = ['301', '501', '701', 'Cricket'];
+  gameModes: WeeklyGameMode[] = ['301', '501'];
   selectedGameMode: WeeklyGameMode = '301';
 
-  bestOfOptions = [1, 3, 5, 7, 9, 11];
+  bestOfOptions = [1, 3, 5];
   selectedBestOf = 3;
 
   recentPlayers: string[] = [];
@@ -35,6 +36,11 @@ export class WeeklyPlayerRegistrationComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadRecentPlayers();
+    this.weekNumber = this.initialWeekNumber = this.getCompletedWeeks() + 1;
+  }
+
+  getCompletedWeeks(): number {
+    return new Set(this.weeklyTournamentService.weeklyResults.map(r => r.weekNumber)).size;
   }
 
   loadRecentPlayers(): void {
