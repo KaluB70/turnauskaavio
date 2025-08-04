@@ -16,6 +16,11 @@ const MAX_RECENT_PLAYERS = 15;
   template: `
     <div *ngIf="!showBracketRoulette" class="bg-gray-100 p-6 rounded-lg shadow">
       <h2 class="text-xl font-semibold mb-4">Turnausmuoto</h2>
+
+      <div class="mb-4">
+        <label class="block mb-2 font-medium">Viikon numero</label>
+        <input type="number" [(ngModel)]="weekNumber" class="w-full p-2 border border-gray-300 rounded-md" />
+      </div>
       
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
@@ -90,7 +95,7 @@ const MAX_RECENT_PLAYERS = 15;
             </div>
           </div>
         </div>
-        
+
         <div>
           <div class="mb-4">
             <label class="block mb-2 font-medium">Pelimuoto
@@ -118,10 +123,19 @@ const MAX_RECENT_PLAYERS = 15;
           </div>
         </div>
       </div>
-      
+
+      <div class="mb-4">
+        <p class="font-medium">Formaatti: {{ tournamentService.tournamentFormat === 'roundRobin' ? 'Round Robin' : 'Lohkot' }}</p>
+      </div>
+
+      <div class="mb-4">
+        <p>Viikkopotti: {{ getWeeklyPrize() | number:'1.0-2' }} €</p>
+        <p>Pääpotti yhteensä: {{ getMainPotPreview() | number:'1.0-2' }} €</p>
+      </div>
+
       <div class="mt-6 flex space-x-3">
-        <button 
-          (click)="startBracketRoulette()" 
+        <button
+          (click)="startBracketRoulette()"
           class="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700"
           [disabled]="(addedPlayers.length < 2)">
           Aloita Turnaus
@@ -132,6 +146,20 @@ const MAX_RECENT_PLAYERS = 15;
           class="bg-gray-300 text-gray-800 py-2 px-6 rounded-md hover:bg-gray-400"
           [disabled]="addedPlayers.length === 0">
           Tyhjennä Pelaajat
+        </button>
+
+        <button
+          (click)="exportPlayers()"
+          class="bg-green-600 text-white py-2 px-6 rounded-md hover:bg-green-700"
+          [disabled]="addedPlayers.length === 0">
+          Vie CSV
+        </button>
+
+        <input type="file" #fileInput accept=".csv" (change)="importPlayers($event)" hidden />
+        <button
+          (click)="fileInput.click()"
+          class="bg-purple-600 text-white py-2 px-6 rounded-md hover:bg-purple-700">
+          Tuo CSV
         </button>
         
         <div *ngIf="errorMessage" class="mt-4 text-red-600">
@@ -157,9 +185,11 @@ export class PlayerRegistrationComponent implements OnInit {
   
   gameModes: GameMode[] = ['301', '501', '701', 'Cricket'];
   selectedGameMode: GameMode = '301';
-  
+
   bestOfOptions = [1, 3, 5, 7, 9, 11];
-  selectedBestOf = 1;
+  selectedBestOf = 3;
+
+  weekNumber = 1;
   
   recentPlayers: string[] = [];
   filteredSuggestions: string[] = [];
@@ -261,6 +291,7 @@ export class PlayerRegistrationComponent implements OnInit {
     this.currentPlayerName = '';
     this.errorMessage = '';
     this.filteredSuggestions = [];
+    this.tournamentService.updateFormat(this.addedPlayers.length);
     
     // Focus back on the input field
     setTimeout(() => {
@@ -271,10 +302,20 @@ export class PlayerRegistrationComponent implements OnInit {
   removePlayer(index: number): void {
     this.addedPlayers.splice(index, 1);
     this.loadRecentPlayers();
+    this.tournamentService.updateFormat(this.addedPlayers.length);
   }
-  
+
   clearPlayers(): void {
     this.addedPlayers = [];
+    this.tournamentService.updateFormat(this.addedPlayers.length);
+  }
+
+  getWeeklyPrize(): number {
+    return this.addedPlayers.length * 5 / 2;
+  }
+
+  getMainPotPreview(): number {
+    return this.tournamentService.totalMainPot + this.addedPlayers.length * 5 / 2;
   }
   
   getGameModeButtonClass(mode: GameMode): string {
@@ -320,6 +361,7 @@ export class PlayerRegistrationComponent implements OnInit {
       // Set the tournament mode settings
       this.tournamentService.gameMode = this.selectedGameMode;
       this.tournamentService.bestOfLegs = this.selectedBestOf;
+      this.tournamentService.weekNumber = this.weekNumber;
       
     } catch (error) {
       this.errorMessage = (error as Error).message;
@@ -347,10 +389,41 @@ export class PlayerRegistrationComponent implements OnInit {
       
       // Save all player names to recent players
       playerNames.forEach(name => this.addToRecentPlayers(name));
-      
+
+      this.tournamentService.weekNumber = this.weekNumber;
       this.tournamentService.registerPlayers(playerNames, this.selectedGameMode, this.selectedBestOf);
     } catch (error) {
       this.errorMessage = (error as Error).message;
     }
+  }
+
+  importPlayers(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result as string;
+      const names = text.split(/\r?\n/).map(n => n.trim()).filter(n => n);
+      names.forEach(name => {
+        if (!this.addedPlayers.includes(name)) {
+          this.addedPlayers.push(name);
+        }
+      });
+      this.tournamentService.updateFormat(this.addedPlayers.length);
+    };
+    reader.readAsText(file, 'utf-8');
+    input.value = '';
+  }
+
+  exportPlayers(): void {
+    const content = this.addedPlayers.join('\n');
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `players-week${this.weekNumber}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 }
