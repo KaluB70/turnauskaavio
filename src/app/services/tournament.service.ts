@@ -46,10 +46,12 @@ interface Pairing {
 }
 
 export type GameMode = '301' | '501' | '701' | 'Cricket';
+export type TournamentFormat = 'roundRobin' | 'groups';
 
 // Keys for localStorage
 const MATCH_HISTORY_KEY = 'darts_match_history';
 const TOURNAMENT_WINNERS_KEY = 'darts_tournament_winners';
+const WEEK_STATS_KEY = 'darts_week_stats';
 
 @Injectable({
   providedIn: 'root',
@@ -62,9 +64,13 @@ export class TournamentService {
   matchHistory: MatchResult[] = [];
   showMatchVictoryAnimation = false;
   showVictoryAnimation = false;
-  gameMode: GameMode = '501';
+  gameMode: GameMode = '301';
   bestOfLegs = 3;
   tournamentWinners: TournamentWinner[] = [];
+  weekNumber = 1;
+  tournamentFormat: TournamentFormat = 'roundRobin';
+  totalMainPot = 0;
+  weekStats: { week: number; playerCount: number; weeklyPrize: number; totalMainPot: number }[] = [];
 
   constructor() {
     this.loadFromLocalStorage();
@@ -91,6 +97,15 @@ export class TournamentService {
           date: new Date(item.date),
         }));
       }
+
+      const savedWeekStats = localStorage.getItem(WEEK_STATS_KEY);
+      if (savedWeekStats) {
+        const parsedStats = JSON.parse(savedWeekStats);
+        this.weekStats = parsedStats;
+        if (this.weekStats.length > 0) {
+          this.totalMainPot = this.weekStats[this.weekStats.length - 1].totalMainPot;
+        }
+      }
     } catch (error) {
       console.error('Error loading data from localStorage:', error);
     }
@@ -106,6 +121,7 @@ export class TournamentService {
         TOURNAMENT_WINNERS_KEY,
         JSON.stringify(this.tournamentWinners)
       );
+      localStorage.setItem(WEEK_STATS_KEY, JSON.stringify(this.weekStats));
     } catch (error) {
       console.error('Error saving data to localStorage:', error);
     }
@@ -120,6 +136,24 @@ export class TournamentService {
     this.players = [];
 
     // Save changes to localStorage
+    this.saveToLocalStorage();
+  }
+
+  updateFormat(playerCount: number): void {
+    this.tournamentFormat = playerCount <= 5 ? 'roundRobin' : 'groups';
+  }
+
+  recordWeek(playerCount: number): void {
+    const totalFees = playerCount * 5;
+    const weeklyPrize = totalFees / 2;
+    const mainPotContribution = totalFees - weeklyPrize;
+    this.totalMainPot += mainPotContribution;
+    this.weekStats.push({
+      week: this.weekNumber,
+      playerCount,
+      weeklyPrize,
+      totalMainPot: this.totalMainPot
+    });
     this.saveToLocalStorage();
   }
 
@@ -153,6 +187,8 @@ export class TournamentService {
 
     this.gameMode = gameMode;
     this.bestOfLegs = bestOfLegs;
+    this.updateFormat(this.players.length);
+    this.recordWeek(this.players.length);
 
     // Calculate the bracket structure
     const rounds = Math.ceil(Math.log2(this.players.length));
@@ -282,6 +318,8 @@ export class TournamentService {
 
     this.gameMode = gameMode;
     this.bestOfLegs = bestOfLegs;
+    this.updateFormat(this.players.length);
+    this.recordWeek(this.players.length);
 
     // Generate optimal bracket with proper bye distribution
     this.generateBracket();

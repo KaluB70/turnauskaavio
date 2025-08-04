@@ -1,44 +1,37 @@
-// src/app/components/player-registration/player-registration.component.ts
-import {Component, OnInit, ElementRef, ViewChild} from '@angular/core';
-import {CommonModule} from '@angular/common';
-import {FormsModule} from '@angular/forms';
-import {TournamentService, GameMode} from '../../services/tournament.service';
-import {HideSelectedPipe} from "./hide-selected.pipe";
-import {BracketRouletteComponent} from '../bracket-roulette/bracket-roulette.component';
+// src/app/components/weekly-player-registration/weekly-player-registration.component.ts
+import { Component, OnInit, ElementRef, ViewChild } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { WeeklyTournamentService, WeeklyGameMode } from '../../services/weekly-tournament.service';
+import { HideSelectedPipe } from '../player-registration/hide-selected.pipe';
 
 const RECENT_PLAYERS_KEY = 'darts_recent_players';
 const MAX_RECENT_PLAYERS = 15;
 
 @Component({
-  selector: 'player-registration',
+  selector: 'weekly-player-registration',
   standalone: true,
-  imports: [CommonModule, FormsModule, HideSelectedPipe, BracketRouletteComponent],
-  templateUrl: './player-registration.component.html',
+  imports: [CommonModule, FormsModule, HideSelectedPipe],
+  templateUrl: './weekly-player-registration.component.html'
 })
-export class PlayerRegistrationComponent implements OnInit {
+export class WeeklyPlayerRegistrationComponent implements OnInit {
   currentPlayerName = '';
   addedPlayers: string[] = [];
   errorMessage = '';
+  weekNumber = 1;
 
-  gameModes: GameMode[] = ['301', '501', '701', 'Cricket'];
-  selectedGameMode: GameMode = '301';
+  gameModes: WeeklyGameMode[] = ['301', '501', '701', 'Cricket'];
+  selectedGameMode: WeeklyGameMode = '301';
 
   bestOfOptions = [1, 3, 5, 7, 9, 11];
   selectedBestOf = 3;
 
-  weekNumber = 1;
-
   recentPlayers: string[] = [];
   filteredSuggestions: string[] = [];
 
-  // New properties for bracket roulette
-  showBracketRoulette = false;
-  preparedPlayers: { id: number; name: string }[] = [];
-
   @ViewChild('playerNameInput') playerNameInput!: ElementRef;
 
-  constructor(public tournamentService: TournamentService) {
-  }
+  constructor(public weeklyTournamentService: WeeklyTournamentService) {}
 
   ngOnInit(): void {
     this.loadRecentPlayers();
@@ -120,7 +113,7 @@ export class PlayerRegistrationComponent implements OnInit {
     );
 
     if (isDuplicate) {
-      this.errorMessage = `Player "${playerName}" is already added.`;
+      this.errorMessage = `Pelaaja "${playerName}" on jo lisätty.`;
       return;
     }
 
@@ -129,7 +122,6 @@ export class PlayerRegistrationComponent implements OnInit {
     this.currentPlayerName = '';
     this.errorMessage = '';
     this.filteredSuggestions = [];
-    this.tournamentService.updateFormat(this.addedPlayers.length);
 
     // Focus back on the input field
     setTimeout(() => {
@@ -140,23 +132,13 @@ export class PlayerRegistrationComponent implements OnInit {
   removePlayer(index: number): void {
     this.addedPlayers.splice(index, 1);
     this.loadRecentPlayers();
-    this.tournamentService.updateFormat(this.addedPlayers.length);
   }
 
   clearPlayers(): void {
     this.addedPlayers = [];
-    this.tournamentService.updateFormat(this.addedPlayers.length);
   }
 
-  getWeeklyPrize(): number {
-    return this.addedPlayers.length * 5 / 2;
-  }
-
-  getMainPotPreview(): number {
-    return this.tournamentService.totalMainPot + this.addedPlayers.length * 5 / 2 + this.tournamentService.players.length * 10;
-  }
-
-  getGameModeButtonClass(mode: GameMode): string {
+  getGameModeButtonClass(mode: WeeklyGameMode): string {
     const baseClass = 'py-2 px-3 rounded-md text-center';
     if (mode === this.selectedGameMode) {
       return `${baseClass} bg-blue-600 text-white`;
@@ -172,74 +154,31 @@ export class PlayerRegistrationComponent implements OnInit {
     return `${baseClass} bg-gray-200 text-gray-800 hover:bg-gray-300`;
   }
 
-  // New method to start the bracket roulette animation
-  startBracketRoulette(): void {
+  startTournament(): void {
     try {
       this.errorMessage = '';
 
-      const playerNames: string[] = [...this.addedPlayers];
+      if (this.addedPlayers.length < 3) {
+        this.errorMessage = 'Vähintään 3 pelaajaa tarvitaan viikkokisoihin.';
+        return;
+      }
 
-      if (playerNames.length < 2) {
-        this.errorMessage = 'Please enter at least 2 player names.';
+      if (this.weekNumber < 1 || this.weekNumber > 10) {
+        this.errorMessage = 'Viikko numeron täytyy olla 1-10 välillä.';
         return;
       }
 
       // Save all player names to recent players
-      playerNames.forEach(name => this.addToRecentPlayers(name));
+      this.addedPlayers.forEach(name => this.addToRecentPlayers(name));
 
-      // Prepare players for the roulette
-      this.preparedPlayers = playerNames.map((name, index) => ({
-        id: index + 1,
-        name: name.trim()
-      }));
-
-      // Show the bracket roulette component
-      this.showBracketRoulette = true;
-
-      // Set the tournament mode settings
-      this.tournamentService.gameMode = this.selectedGameMode;
-      this.tournamentService.bestOfLegs = this.selectedBestOf;
-      this.tournamentService.weekNumber = this.weekNumber;
-
+      this.weeklyTournamentService.registerPlayers(
+        this.addedPlayers,
+        this.selectedGameMode,
+        this.selectedBestOf,
+        this.weekNumber
+      );
     } catch (error) {
       this.errorMessage = (error as Error).message;
     }
-  }
-
-  // Called when tournament is ready to start after animation
-  onTournamentReady(): void {
-    // No need to do anything here as the BracketRouletteComponent
-    // will handle starting the tournament
-    this.showBracketRoulette = false;
-  }
-
-  importPlayers(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (!input.files || input.files.length === 0) return;
-    const file = input.files[0];
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = reader.result as string;
-      const names = text.split(/\r?\n/).map(n => n.trim()).filter(n => n);
-      names.forEach(name => {
-        if (!this.addedPlayers.includes(name)) {
-          this.addedPlayers.push(name);
-        }
-      });
-      this.tournamentService.updateFormat(this.addedPlayers.length);
-    };
-    reader.readAsText(file, 'utf-8');
-    input.value = '';
-  }
-
-  exportPlayers(): void {
-    const content = this.addedPlayers.join('\n');
-    const blob = new Blob([content], {type: 'text/csv;charset=utf-8;'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `players-week${this.weekNumber}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
   }
 }
