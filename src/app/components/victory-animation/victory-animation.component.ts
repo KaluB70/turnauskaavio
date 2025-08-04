@@ -1,245 +1,267 @@
 // src/app/components/victory-animation/victory-animation.component.ts
-import { Component, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { trigger, state, style, animate, transition } from '@angular/animations';
 import { TournamentService } from '../../services/tournament.service';
 
 @Component({
   selector: 'victory-animation',
   standalone: true,
   imports: [CommonModule],
+  animations: [
+    trigger('fadeInScale', [
+      transition(':enter', [
+        style({ opacity: 0, transform: 'scale(0.3)' }),
+        animate('1s cubic-bezier(0.175, 0.885, 0.32, 1.275)', style({ opacity: 1, transform: 'scale(1)' })),
+      ]),
+    ]),
+    trigger('slideUp', [
+      transition(':enter', [
+        style({ opacity: 0, transform: 'translateY(50px)' }),
+        animate('0.8s 0.5s ease-out', style({ opacity: 1, transform: 'translateY(0)' })),
+      ]),
+    ]),
+    trigger('float', [
+      state('floating', style({ transform: 'translateY(-10px)' })),
+      transition('* => floating', animate('2s ease-in-out')),
+      transition('floating => *', animate('2s ease-in-out')),
+    ]),
+  ],
   styles: [`
-    .firework {
-      position: absolute;
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      animation: explode 1s ease-out forwards;
+    .victory-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
     }
-    @keyframes explode {
-      0% {
+
+    .victory-content {
+      text-align: center;
+      color: white;
+      max-width: 90vw;
+      position: relative;
+    }
+
+    .trophy-container {
+      position: relative;
+      margin-bottom: 2rem;
+    }
+
+    .main-trophy {
+      font-size: 8rem;
+      filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
+      animation: pulse-glow 3s ease-in-out infinite;
+    }
+
+    .floating-emojis {
+      position: absolute;
+      font-size: 2rem;
+      animation: float-around 4s ease-in-out infinite;
+    }
+
+    .emoji-1 { top: -20px; left: -60px; animation-delay: 0s; }
+    .emoji-2 { top: -40px; right: -60px; animation-delay: 1s; }
+    .emoji-3 { bottom: -20px; left: -40px; animation-delay: 2s; }
+    .emoji-4 { bottom: -40px; right: -40px; animation-delay: 1.5s; }
+
+    @keyframes pulse-glow {
+      0%, 100% {
         transform: scale(1);
-        opacity: 1;
-      }
-      100% {
-        transform: scale(40);
-        opacity: 0;
-      }
-    }
-    .particle {
-      position: absolute;
-      width: 3px;
-      height: 3px;
-      border-radius: 50%;
-      animation: shoot 1s ease-out forwards;
-    }
-    @keyframes shoot {
-      0% {
-        transform: translateY(0) translateX(0);
-        opacity: 1;
-      }
-      100% {
-        transform: translateY(calc(var(--dy) * 80px)) translateX(calc(var(--dx) * 80px));
-        opacity: 0;
-      }
-    }
-    .trophy {
-      animation: bounce 2s infinite;
-    }
-    @keyframes bounce {
-      0%, 100% {
-        transform: translateY(0);
+        filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3)) brightness(1);
       }
       50% {
-        transform: translateY(-20px);
+        transform: scale(1.05);
+        filter: drop-shadow(0 15px 30px rgba(0,0,0,0.4)) brightness(1.1);
       }
     }
-    .confetti {
-      position: absolute;
-      width: 10px;
-      height: 10px;
-      animation: fall 4s linear forwards;
-    }
-    @keyframes fall {
-      0% {
-        transform: translateY(-100px) rotate(0deg);
-        opacity: 1;
-      }
-      100% {
-        transform: translateY(500px) rotate(360deg);
-        opacity: 0;
-      }
-    }
-    .champion-text {
-      animation: glow 2s ease-in-out infinite;
-    }
-    @keyframes glow {
+
+    @keyframes float-around {
       0%, 100% {
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        transform: translateY(0px) rotate(0deg);
+      }
+      25% {
+        transform: translateY(-15px) rotate(5deg);
       }
       50% {
-        text-shadow: 0 0 20px rgba(255, 255, 255, 1), 0 0 30px rgba(255, 215, 0, 0.8);
+        transform: translateY(-5px) rotate(-5deg);
       }
+      75% {
+        transform: translateY(-20px) rotate(3deg);
+      }
+    }
+
+    .winner-name {
+      background: linear-gradient(45deg, #fbbf24, #f59e0b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .sparkle {
+      position: absolute;
+      color: #fbbf24;
+      animation: sparkle 2s ease-in-out infinite;
+    }
+
+    @keyframes sparkle {
+      0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+      50% { opacity: 1; transform: scale(1) rotate(180deg); }
+    }
+
+    .celebration-text {
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .action-buttons {
+      margin-top: 3rem;
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .action-button {
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 1rem 2rem;
+      border-radius: 50px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .action-button:hover {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: rgba(255, 255, 255, 0.5);
+      transform: translateY(-2px);
+    }
+
+    .primary-button {
+      background: linear-gradient(135deg, #10b981, #059669);
+      border-color: #047857;
+    }
+
+    .primary-button:hover {
+      background: linear-gradient(135deg, #059669, #047857);
     }
   `],
   template: `
-    <div class="bg-blue-900 text-white p-8 rounded-lg shadow-lg relative overflow-hidden" 
-         style="min-height: 400px;">
-      
-      <div *ngFor="let firework of fireworks" 
-           class="firework" 
-           [style.left.px]="firework.x" 
-           [style.top.px]="firework.y" 
-           [style.background-color]="firework.color">
-      </div>
-      
-      <div *ngFor="let particle of particles" 
-           class="particle" 
-           [style.left.px]="particle.x" 
-           [style.top.px]="particle.y" 
-           [style.background-color]="particle.color" 
-           [style.--dx]="particle.dx" 
-           [style.--dy]="particle.dy">
-      </div>
-      
-      <div *ngFor="let confetti of confettis"
-           class="confetti"
-           [style.left.px]="confetti.x"
-           [style.top.px]="confetti.y"
-           [style.background-color]="confetti.color"
-           [style.transform]="'rotate(' + confetti.rotation + 'deg)'">
-      </div>
-      
-      <div class="text-center py-12 relative z-10">
-        <div class="text-6xl font-bold mb-8 trophy">🏆</div>
-        <h1 class="text-4xl font-bold mb-4 champion-text">KULTAMESTARI!</h1>
-        <p class="text-2xl mb-6 bg-blue-800 inline-block px-4 py-2 rounded-full">{{ getWinnerName() }}</p>
-        
-        <div class="mt-6 text-xl">
-          <p>Pelimuoto: <span class="font-bold">{{ tournamentService.gameMode }}</span></p>
-          <p>Best of {{ tournamentService.bestOfLegs }}</p>
+    <div class="victory-overlay">
+      <!-- Sparkle effects -->
+      <div class="sparkle" style="top: 20%; left: 15%; animation-delay: 0s;">✨</div>
+      <div class="sparkle" style="top: 30%; right: 20%; animation-delay: 0.5s;">⭐</div>
+      <div class="sparkle" style="bottom: 30%; left: 10%; animation-delay: 1s;">💫</div>
+      <div class="sparkle" style="bottom: 20%; right: 15%; animation-delay: 1.5s;">✨</div>
+      <div class="sparkle" style="top: 50%; left: 5%; animation-delay: 2s;">⭐</div>
+      <div class="sparkle" style="top: 40%; right: 8%; animation-delay: 2.5s;">💫</div>
+
+      <div class="victory-content">
+        <div class="trophy-container" @fadeInScale>
+          <div class="main-trophy">🏆</div>
+          <div class="floating-emojis emoji-1">🎯</div>
+          <div class="floating-emojis emoji-2">🎉</div>
+          <div class="floating-emojis emoji-3">🥇</div>
+          <div class="floating-emojis emoji-4">🎊</div>
         </div>
-        
-        <div class="flex justify-center mt-8 space-x-4">          
-          <button 
-            (click)="startNewTournament()" 
-            class="bg-blue-600 text-white py-3 px-8 rounded-full text-xl font-bold hover:bg-blue-700 transition-colors">
-            Etusivu
-          </button>
-          
-          <button 
-            (click)="restartWithSamePlayers()" 
-            class="bg-green-600 text-white py-3 px-8 rounded-full text-xl font-bold hover:bg-green-700 transition-colors">
-            Aloita uudelleen
-          </button>
+
+        <div @slideUp>
+          <h1 class="text-4xl md:text-6xl font-bold mb-4 celebration-text">
+            VOITTAJA!
+          </h1>
+
+          <div class="winner-name text-5xl md:text-7xl font-bold mb-8">
+            {{ getWinnerName() }}
+          </div>
+
+          <p class="text-xl md:text-2xl mb-4 celebration-text">
+            Onnittelut mestaruudesta! 🎉
+          </p>
+
+          <div class="text-lg celebration-text">
+            {{ getTournamentStats() }}
+          </div>
+
+          <div class="action-buttons">
+            <button
+              class="action-button primary-button"
+              (click)="startNewTournament()">
+              🏠 Etusivu
+            </button>
+
+            <button
+              class="action-button"
+              (click)="restartWithSamePlayers()">
+              🔄 Uusi turnaus samoilla pelaajilla
+            </button>
+          </div>
         </div>
       </div>
     </div>
   `
 })
-export class VictoryAnimationComponent {
-  fireworks: { x: number; y: number; color: string }[] = [];
-  particles: { x: number; y: number; dx: number; dy: number; color: string }[] = [];
-  confettis: { x: number; y: number; color: string; rotation: number }[] = [];
-  animationInterval: any;
-  confettiInterval: any;
-  colors = ['#ff0000', '#ffff00', '#00ff00', '#00ffff', '#0000ff', '#ff00ff', '#ff8800', '#88ff00'];
-  confettiColors = ['#FFC700', '#FF0000', '#2E3191', '#41BBC7', '#00FF00', '#FF00FF'];
-  
+export class VictoryAnimationComponent implements OnInit, OnDestroy {
+  private floatingState = 'floating';
+  private floatingTimer: any;
+
   constructor(public tournamentService: TournamentService) {}
-  
-  ngOnInit() {
-    this.startFireworks();
-    this.startConfetti();
-  }
-  
-  ngOnDestroy() {
-    this.clearAnimations();
-  }
-  
-  startFireworks() {
-    this.clearAnimations();
-    this.animationInterval = setInterval(() => {
-      this.createFirework();
-    }, 300);
-  }
-  
-  startConfetti() {
-    this.confettiInterval = setInterval(() => {
-      this.createConfetti();
-    }, 100);
-  }
-  
-  clearAnimations() {
-    if (this.animationInterval) {
-      clearInterval(this.animationInterval);
-    }
-    if (this.confettiInterval) {
-      clearInterval(this.confettiInterval);
-    }
-  }
-  
-  createFirework() {
-    const color = this.colors[Math.floor(Math.random() * this.colors.length)];
-    const x = 100 + Math.random() * 600;
-    const y = 50 + Math.random() * 300;
-    
-    this.fireworks.push({ x, y, color });
-    
-    // Create particles
-    for (let i = 0; i < 20; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const dx = Math.cos(angle);
-      const dy = Math.sin(angle);
-      
-      this.particles.push({
-        x, y, dx, dy, color
-      });
-    }
-    
-    // Cleanup old fireworks and particles
+
+  ngOnInit(): void {
+    // Toggle floating animation every 2 seconds
+    this.floatingTimer = setInterval(() => {
+      this.floatingState = this.floatingState === 'floating' ? 'normal' : 'floating';
+    }, 2000);
+
+    // Auto-hide after 10 seconds
     setTimeout(() => {
-      this.fireworks.shift();
-      for (let i = 0; i < 20; i++) {
-        if (this.particles.length > 0) {
-          this.particles.shift();
-        }
-      }
-    }, 1000);
+      this.tournamentService.showVictoryAnimation = false;
+    }, 10000);
   }
-  
-  createConfetti() {
-    const color = this.confettiColors[Math.floor(Math.random() * this.confettiColors.length)];
-    const x = Math.random() * window.innerWidth;
-    const y = -20;
-    const rotation = Math.random() * 360;
-    
-    this.confettis.push({ x, y, color, rotation });
-    
-    // Cleanup old confetti
-    if (this.confettis.length > 100) {
-      this.confettis.shift();
+
+  ngOnDestroy(): void {
+    if (this.floatingTimer) {
+      clearInterval(this.floatingTimer);
     }
   }
-  
+
   getWinnerName(): string {
-    if (this.tournamentService.matches.length === 0) return '';
-    
+    if (this.tournamentService.matches.length === 0) return 'Unknown';
+
     const finalMatch = this.tournamentService.matches[this.tournamentService.matches.length - 1];
-    if (finalMatch.winner) {
+    if (finalMatch && finalMatch.winner) {
       return this.tournamentService.getPlayerName(finalMatch.winner);
     }
-    return '';
+    return 'Unknown';
   }
-  
-  startNewTournament() {
+
+  getTournamentStats(): string {
+    const playerCount = this.tournamentService.players.length;
+    const gameMode = this.tournamentService.gameMode;
+    const bestOf = this.tournamentService.bestOfLegs;
+
+    return `${playerCount} pelaajan turnaus • ${gameMode} • BO${bestOf}`;
+  }
+
+  startNewTournament(): void {
+    this.tournamentService.showVictoryAnimation = false;
     this.tournamentService.resetTournament();
   }
-  
-  restartWithSamePlayers() {
+
+  restartWithSamePlayers(): void {
     const playerNames = this.tournamentService.players.map(p => p.name);
     const gameMode = this.tournamentService.gameMode;
     const bestOfLegs = this.tournamentService.bestOfLegs;
-    
+
+    this.tournamentService.showVictoryAnimation = false;
     this.tournamentService.resetTournament();
     this.tournamentService.registerPlayers(playerNames, gameMode, bestOfLegs);
   }
