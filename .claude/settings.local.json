@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(ng test:*)",
+      "Bash(npm test:*)",
+      "Bash(ng serve:*)",
+      "Bash(ng build)",
+      "Bash(find:*)",
+      "Bash(ng build:*)"
+    ],
+    "deny": []
+  }
+}

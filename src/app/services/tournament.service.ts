@@ -1,742 +1,1406 @@
-// src/app/services/tournament.service.ts
-import { Injectable } from '@angular/core';
+import {Injectable} from '@angular/core';
+import {SheetsService} from './sheets.service';
+import {firstValueFrom} from 'rxjs';
 
 export interface Player {
-  id: number;
-  name: string;
+	id: number;
+	name: string;
+	group?: number;
 }
 
 export interface Match {
-  id: number;
-  round: number;
-  position: number;
-  player1Id: number | null;
-  player2Id: number | null;
-  winner: number | null;
-  player1Score: number | null;
-  player2Score: number | null;
-  player1Legs: number;
-  player2Legs: number;
-  isComplete: boolean;
+	id: number;
+	player1Id: number;
+	player2Id: number;
+	player1Legs: number;
+	player2Legs: number;
+	winner: number | null;
+	isComplete: boolean;
+	round: 'group' | 'playoff' | 'final';
+	group?: number;
+	// Optional 3rd player for finals (when 3+ finalists)
+	player3Id?: number;
+	player3Legs?: number;
+	// Track finish order for 3-way finals
+	finishOrder?: number[]; // [winnerId, 2ndPlaceId, 3rdPlaceId]
 }
 
-export interface MatchResult {
-  matchId: number;
-  player1Name: string;
-  player2Name: string;
-  player1Score: number;
-  player2Score: number;
-  player1Legs: number;
-  player2Legs: number;
-  winnerName: string;
-  timestamp: Date;
-  gameMode: string;
+export interface Standing {
+	playerId: number;
+	playerName: string;
+	wins: number;
+	losses: number;
+	legDifference: number;
+	points: number;
+	group: number;
 }
 
-export interface TournamentWinner {
-  playerName: string;
-  gameMode: string;
-  date: Date;
-  playerCount: number;
+export interface WeekResult {
+	weekNumber: number;
+	players: Player[];
+	finalRanking: { playerId: number; playerName: string; position: number; points: number }[];
+	date: Date;
+	gameMode: string;
 }
 
-interface Pairing {
-  player1: string | null;
-  player2: string | null;
+export interface SeasonStanding {
+	playerName: string;
+	totalPoints: number;
+	weeksPlayed: number;
+	wins: number;
+	podiumFinishes: number;
+	averagePosition: number;
+	weeklyResults: { week: number; position: number; points: number }[];
 }
 
-export type GameMode = '301' | '501' | '701' | 'Cricket';
-export type TournamentFormat = 'roundRobin' | 'groups';
+export type GameMode = '301' | '501';
 
-// Keys for localStorage
-const MATCH_HISTORY_KEY = 'darts_match_history';
-const TOURNAMENT_WINNERS_KEY = 'darts_tournament_winners';
-const WEEK_STATS_KEY = 'darts_week_stats';
+const RESULTS_KEY = 'darts_results';
+const TOURNAMENTS_KEY = 'darts_tournaments';
 
 @Injectable({
-  providedIn: 'root',
+	providedIn: 'root'
 })
 export class TournamentService {
-  players: Player[] = [];
-  matches: Match[] = [];
-  currentMatch: Match | null = null;
-  isStarted = false;
-  matchHistory: MatchResult[] = [];
-  showMatchVictoryAnimation = false;
-  showVictoryAnimation = false;
-  gameMode: GameMode = '301';
-  bestOfLegs = 3;
-  tournamentWinners: TournamentWinner[] = [];
-  weekNumber = 1;
-  tournamentFormat: TournamentFormat = 'roundRobin';
-  totalMainPot = 0;
-  weekStats: { week: number; playerCount: number; weeklyPrize: number; totalMainPot: number }[] = [];
+	players: Player[] = [];
+	matches: Match[] = [];
+	standings: Standing[] = [];
+	finalists: Player[] = [];
 
-  constructor() {
-    this.loadFromLocalStorage();
-  }
+	currentMatch: Match | null = null;
+	isStarted = false;
+	gameMode: GameMode = '301';
+	bestOfLegs = 3;
+	weekNumber = 1;
+	tournamentId: string | null = null;
 
-  private loadFromLocalStorage(): void {
-    try {
-      // Load match history
-      const savedHistory = localStorage.getItem(MATCH_HISTORY_KEY);
-      if (savedHistory) {
-        const parsedHistory = JSON.parse(savedHistory);
-        this.matchHistory = parsedHistory.map((item: any) => ({
-          ...item,
-          timestamp: new Date(item.timestamp),
-        }));
-      }
+	tournamentType: 'round-robin' | 'groups' | 'groups-3' = 'round-robin';
+	currentPhase: 'group' | 'playoff' | 'final' = 'group';
 
-      // Load tournament winners
-      const savedWinners = localStorage.getItem(TOURNAMENT_WINNERS_KEY);
-      if (savedWinners) {
-        const parsedWinners = JSON.parse(savedWinners);
-        this.tournamentWinners = parsedWinners.map((item: any) => ({
-          ...item,
-          date: new Date(item.date),
-        }));
-      }
+	showMatchWinner = false;
+	showRoulette = false;
+	winnerName = '';
 
-      const savedWeekStats = localStorage.getItem(WEEK_STATS_KEY);
-      if (savedWeekStats) {
-        const parsedStats = JSON.parse(savedWeekStats);
-        this.weekStats = parsedStats;
-        if (this.weekStats.length > 0) {
-          this.totalMainPot = this.weekStats[this.weekStats.length - 1].totalMainPot;
-        }
-      }
-    } catch (error) {
-      console.error('Error loading data from localStorage:', error);
-    }
-  }
+	// Tiebreaker state
+	requiresTiebreaker = false;
+	tiebreakerPlayers: Player[] = [];
+	tiebreakerScores: { [playerId: number]: number[] } = {};
 
-  private saveToLocalStorage(): void {
-    try {
-      localStorage.setItem(
-        MATCH_HISTORY_KEY,
-        JSON.stringify(this.matchHistory)
-      );
-      localStorage.setItem(
-        TOURNAMENT_WINNERS_KEY,
-        JSON.stringify(this.tournamentWinners)
-      );
-      localStorage.setItem(WEEK_STATS_KEY, JSON.stringify(this.weekStats));
-    } catch (error) {
-      console.error('Error saving data to localStorage:', error);
-    }
-  }
+	// Tiebreaker UI state (for refresh persistence)
+	tiebreakerUIState = {
+		currentRoundScores: {} as { [playerId: number]: number[] },
+		showResults: false,
+		results: [] as { playerName: string; total: number }[],
+		stillTied: false
+	};
 
-  resetTournament(): void {
-    this.matches = [];
-    this.currentMatch = null;
-    this.isStarted = false;
-    this.showVictoryAnimation = false;
-    this.showMatchVictoryAnimation = false;
-    this.players = [];
+	// Tournament completion state
+	tournamentCompleted = false;
 
-    // Save changes to localStorage
-    this.saveToLocalStorage();
-  }
+	weekResults: WeekResult[] = [];
 
-  updateFormat(playerCount: number): void {
-    this.tournamentFormat = playerCount <= 5 ? 'roundRobin' : 'groups';
-  }
+	constructor(private sheetsService: SheetsService) {
+		this.loadWeekResults();
+	}
 
-  recordWeek(playerCount: number): void {
-    const totalFees = playerCount * 5;
-    const weeklyPrize = totalFees / 2;
-    const mainPotContribution = totalFees - weeklyPrize;
-    this.totalMainPot += mainPotContribution;
-    this.weekStats.push({
-      week: this.weekNumber,
-      playerCount,
-      weeklyPrize,
-      totalMainPot: this.totalMainPot
-    });
-    this.saveToLocalStorage();
-  }
+	private loadWeekResults(): void {
+		try {
+			const saved = localStorage.getItem(RESULTS_KEY);
+			if (saved) {
+				const data = JSON.parse(saved);
+				this.weekResults = data.map((item: any) => ({
+					...item,
+					date: new Date(item.date)
+				}));
+			}
+		} catch (error) {
+			console.error('Error loading data:', error);
+		}
+	}
 
-  // Register players with explicit pairings (from bracket roulette)
-  registerPlayersWithPairings(
-    pairings: Pairing[],
-    gameMode: GameMode,
-    bestOfLegs: number
-  ): void {
-    // Reset any existing tournament data
-    this.resetTournament();
-    
-    // Get all unique player names from pairings
-    const playerNames: string[] = [];
-    pairings.forEach((pair) => {
-      if (pair.player1) playerNames.push(pair.player1);
-      if (pair.player2) playerNames.push(pair.player2);
-    });
+	/**
+	 * Load season data from Google Sheets (read-only)
+	 * This will merge with localStorage data, preferring localStorage for newer data
+	 */
+	async loadSeasonDataFromSheets(): Promise<void> {
+		try {
+			const sheetsData = await firstValueFrom(this.sheetsService.fetchSheetData('WeekResults'));
 
-    // Create player objects with IDs
-    this.players = playerNames
-      .filter((name) => name.trim() !== '')
-      .map((name, index) => ({
-        id: index + 1,
-        name: name.trim(),
-      }));
+			if (sheetsData && sheetsData.length > 0) {
+				// Convert sheets data to WeekResult format
+				const sheetsWeekResults = this.convertSheetsToWeekResults(sheetsData);
 
-    if (this.players.length < 2) {
-      throw new Error('At least 2 players are required');
-    }
+				// Merge with existing localStorage data
+				// localStorage takes priority for same week numbers
+				// Update in-memory data
+				this.weekResults = this.mergeWeekResults(sheetsWeekResults, this.weekResults);
 
-    this.gameMode = gameMode;
-    this.bestOfLegs = bestOfLegs;
-    this.updateFormat(this.players.length);
-    this.recordWeek(this.players.length);
+				// Persist the merged data back to localStorage
+				this.saveWeekResults();
 
-    // Calculate the bracket structure
-    const rounds = Math.ceil(Math.log2(this.players.length));
-    
-    // Initialize matches for all rounds
-    this.createMatchesForAllRounds(rounds);
-    
-    // Apply the pairings to the first round
-    this.applyPairingsToFirstRound(pairings);
-    
-    // Process byes in the first round
-    this.processFirstRoundByes();
-    
-    // Save match history to localStorage
-    this.saveToLocalStorage();
+				console.log(`Loaded ${sheetsWeekResults.length} week results from Google Sheets and persisted to localStorage`);
+			}
+		} catch (error) {
+			console.warn('Failed to load data from Google Sheets:', error);
+			// Continue with localStorage data only
+		}
+	}
 
-    // Start the tournament
-    this.isStarted = true;
-    this.findNextMatch();
-  }
-  
-  private createMatchesForAllRounds(rounds: number): void {
-    this.matches = [];
-    
-    for (let round = 0; round < rounds; round++) {
-      const matchesInRound = Math.pow(2, rounds - round - 1);
+	private convertSheetsToWeekResults(sheetsData: any[]): WeekResult[] {
+		// Group the normalized CSV data by week number
+		// Expected columns: Viikko, Pvm, Pelaajia, Pelimuoto, Sija, Pelaaja, Pisteet
 
-      for (let position = 0; position < matchesInRound; position++) {
-        const matchId = this.matches.length + 1;
-        this.matches.push({
-          id: matchId,
-          round,
-          position,
-          player1Id: null,
-          player2Id: null,
-          winner: null,
-          player1Score: null,
-          player2Score: null,
-          player1Legs: 0,
-          player2Legs: 0,
-          isComplete: false,
-        });
-      }
-    }
-  }
-  
-  private applyPairingsToFirstRound(pairings: Pairing[]): void {
-    const firstRoundMatches = this.matches.filter(m => m.round === 0);
-    
-    pairings.forEach((pair, index) => {
-      if (index < firstRoundMatches.length) {
-        const match = firstRoundMatches[index];
+		const weekGroups: { [weekNumber: number]: any[] } = {};
 
-        // Find player IDs by name
-        if (pair.player1) {
-          const player1 = this.players.find(p => p.name === pair.player1);
-          if (player1) match.player1Id = player1.id;
-        }
+		// Group rows by week number
+		sheetsData.forEach(row => {
+			const weekNumber = Number(row.Viikko) || Number(row.weekNumber) || 0;
+			if (weekNumber > 0) {
+				if (!weekGroups[weekNumber]) {
+					weekGroups[weekNumber] = [];
+				}
+				weekGroups[weekNumber].push(row);
+			}
+		});
 
-        if (pair.player2) {
-          const player2 = this.players.find(p => p.name === pair.player2);
-          if (player2) match.player2Id = player2.id;
-        }
-      }
-    });
-  }
-  
-  private processFirstRoundByes(): void {
-    const firstRoundMatches = this.matches.filter(m => m.round === 0);
-    
-    for (const match of firstRoundMatches) {
-      // If only one player in the match (bye), advance them automatically
-      if (match.player1Id !== null && match.player2Id === null) {
-        this.completeByeMatch(match, match.player1Id);
-      } else if (match.player1Id === null && match.player2Id !== null) {
-        this.completeByeMatch(match, match.player2Id);
-      }
-    }
-  }
-  
-  private completeByeMatch(match: Match, winnerId: number): void {
-    match.winner = winnerId;
-    match.player1Score = match.player1Id === winnerId ? this.getInitialScore() : 0;
-    match.player2Score = match.player2Id === winnerId ? this.getInitialScore() : 0;
-    match.player1Legs = match.player1Id === winnerId ? Math.ceil(this.bestOfLegs / 2) : 0;
-    match.player2Legs = match.player2Id === winnerId ? Math.ceil(this.bestOfLegs / 2) : 0;
-    match.isComplete = true;
+		// Convert each week group to WeekResult
+		return Object.entries(weekGroups).map(([weekNum, rows]) => {
+			const weekNumber = Number(weekNum);
+			const firstRow = rows[0];
 
-    // Record match history for bye
-    this.matchHistory.push({
-      matchId: match.id,
-      player1Name: match.player1Id ? this.getPlayerName(match.player1Id) : 'Bye',
-      player2Name: match.player2Id ? this.getPlayerName(match.player2Id) : 'Bye',
-      player1Score: match.player1Score || 0,
-      player2Score: match.player2Score || 0,
-      player1Legs: match.player1Legs,
-      player2Legs: match.player2Legs,
-      winnerName: this.getPlayerName(winnerId),
-      timestamp: new Date(),
-      gameMode: this.gameMode
-    });
+			// Parse date from Finnish format (d.m.yyyy) to proper date
+			let date = new Date();
+			const dateStr = (firstRow.Pvm as string) || firstRow.date || '';
+			if (dateStr) {
+				const [day, month, year] = dateStr.split('.');
+				if (day && month && year) {
+					date = new Date(Number(year), Number(month) - 1, Number(day));
+				}
+			}
 
-    // Advance winner to next round
-    this.advancePlayerToNextRound(match);
-  }
+			// Extract unique players for this week
+			const playerNames = [...new Set(rows.map(row => row.Pelaaja || row.playerName || '').filter(name => name))];
+			const players = playerNames.map((name, index) => ({
+				id: this.getPlayerIdByName(name, weekNumber, index + 1),
+				name: name
+			}));
 
-  // Original method for creating a tournament with player names only
-  registerPlayers(
-    playerNames: string[],
-    gameMode: GameMode,
-    bestOfLegs: number
-  ): void {
-    // Reset any existing tournament
-    this.resetTournament();
-    
-    // Create player objects
-    this.players = playerNames
-      .filter(name => name.trim() !== '')
-      .map((name, index) => ({
-        id: index + 1,
-        name: name.trim()
-      }));
+			// Build final ranking from the position data
+			const finalRanking = rows
+				.filter(row => (row.Pelaaja || row.playerName) && (row.Sija || row.position))
+				.map(row => {
+					const playerName = row.Pelaaja || row.playerName || '';
+					const position = Number(row.Sija || row.position) || 0;
+					const points = Number(row.Pisteet || row.points) || 0;
+					const playerId = this.getPlayerIdByName(playerName, weekNumber, position);
 
-    if (this.players.length < 2) {
-      throw new Error('At least 2 players are required');
-    }
+					return {
+						playerId,
+						playerName,
+						position,
+						points
+					};
+				})
+				.filter(ranking => ranking.playerName && ranking.position > 0)
+				.sort((a, b) => a.position - b.position);
 
-    this.gameMode = gameMode;
-    this.bestOfLegs = bestOfLegs;
-    this.updateFormat(this.players.length);
-    this.recordWeek(this.players.length);
+			// Remove duplicates (keep first occurrence of each position)
+			const uniqueRankings: typeof finalRanking = [];
+			const seenPositions = new Set<number>();
 
-    // Generate optimal bracket with proper bye distribution
-    this.generateBracket();
-    
-    // Start the tournament
-    this.isStarted = true;
-    this.findNextMatch();
-  }
+			finalRanking.forEach(ranking => {
+				if (!seenPositions.has(ranking.position)) {
+					seenPositions.add(ranking.position);
+					uniqueRankings.push(ranking);
+				}
+			});
 
-  // Generate a bracket with optimal bye distribution
-  private generateBracket(): void {
-    const playerCount = this.players.length;
-    
-    // Calculate rounds and byes
-    const rounds = Math.ceil(Math.log2(playerCount));
-    const totalSlots = Math.pow(2, rounds);
-    const byeCount = totalSlots - playerCount;
-    
-    // Create matches for all rounds
-    this.createMatchesForAllRounds(rounds);
-    
-    // Get first round matches
-    const firstRoundMatches = this.matches.filter(m => m.round === 0);
-    
-    // Get optimal bye distribution
-    const seedPositions = this.generateOptimalSeedPositions(totalSlots, playerCount);
-    
-    // Shuffle players for random assignment
-    const shuffledPlayers = [...this.players].sort(() => Math.random() - 0.5);
-    
-    // Assign players to positions based on seed positions
-    this.assignPlayersToFirstRound(firstRoundMatches, seedPositions, shuffledPlayers);
-    
-    // Process byes
-    this.processFirstRoundByes();
-    
-    // Save to localStorage
-    this.saveToLocalStorage();
-  }
-  
-  private generateOptimalSeedPositions(totalSlots: number, playerCount: number): boolean[] {
-    const byeCount = totalSlots - playerCount;
-    // Start with all positions marked as players
-    const positions = Array(totalSlots).fill(true); // true = player, false = bye
-    
-    if (byeCount === 0) return positions;
-    
-    // Handle specific cases for testing
-    if (totalSlots === 8 && playerCount === 5) {
-      // For 5 players, place 3 byes optimally
-      positions[1] = false;  // Position 1 (0-indexed)
-      positions[4] = false;  // Position 4 (0-indexed)
-      positions[6] = false;  // Position 6 (0-indexed)
-      return positions;
-    }
-    
-    if (totalSlots === 16 && playerCount === 9) {
-      // For 9 players in 16-slot bracket, we need 7 byes
-      // Place them optimally to avoid bye vs bye matches
-      positions[1] = false;
-      positions[4] = false;
-      positions[6] = false;
-      positions[9] = false;
-      positions[11] = false;
-      positions[13] = false;
-      positions[15] = false;
-      return positions;
-    }
-    
-    // For 8-player bracket with 2 byes (6 players), we need special handling
-    if (totalSlots === 8 && byeCount === 2) {
-      // Place byes at positions 2 and 7 (0-indexed: 1 and 6)
-      positions[1] = false;
-      positions[6] = false;
-      return positions;
-    }
-    
-    // For other cases, use standard seeding with specific bye placement
-    // Convert player count to number of first-round matches
-    const firstRoundMatches = totalSlots / 2;
-    
-    // Create match groups (where each match is two adjacent positions)
-    const matchGroups: any[] = [];
-    for (let i = 0; i < firstRoundMatches; i++) {
-      matchGroups.push([i*2, i*2 + 1]);
-    }
-    
-    // Place byes based on traditional seeding pattern
-    const byeMatchIndices = [];
-    for (let i = 0; i < byeCount && i < matchGroups.length; i++) {
-      // Place bye in every other match, starting from the bottom
-      byeMatchIndices.push(matchGroups.length - 1 - (i * 2));
-    }
-    
-    // If we need more byes, continue with matches from the bottom up
-    if (byeCount > byeMatchIndices.length) {
-      for (let i = 0; i < byeCount - byeMatchIndices.length; i++) {
-        byeMatchIndices.push(matchGroups.length - 2 - (i * 2));
-      }
-    }
-    
-    // For each match with a bye, place the bye in one position
-    // Always place bye in 2nd position unless byeCount equals half the players
-    byeMatchIndices.forEach(matchIndex => {
-      if (matchIndex >= 0 && matchIndex < matchGroups.length) {
-        // Place bye in 2nd position of the match (odd-indexed positions)
-        positions[matchGroups[matchIndex][1]] = false;
-      }
-    });
-    
-    return positions;
-  }
-  
-  // Ensure we never have a bye vs bye match
-  private ensureNoByeVsBye(positions: boolean[]): void {
-    // Iterate through matches (pairs of positions)
-    for (let i = 0; i < positions.length; i += 2) {
-      if (!positions[i] && !positions[i + 1]) {
-        console.log(`Found a bye vs bye match at positions ${i} and ${i+1}`);
-        
-        // Found a bye vs bye match - fix it by converting one bye to player
-        positions[i] = true;
-        
-        // Now find a real player and convert to bye to maintain the bye count
-        for (let j = 0; j < positions.length; j += 2) {
-          // Look for a match with two players
-          if (positions[j] && positions[j + 1]) {
-            positions[j] = false; // Convert to bye
-            console.log(`Fixed bye vs bye by converting position ${j} to bye`);
-            break;
-          }
-        }
-      }
-    }
-  }
-  
-  // Assign players to first round matches based on seed positions
-  private assignPlayersToFirstRound(
-    matches: Match[], 
-    seedPositions: boolean[], 
-    players: Player[]
-  ): void {
-    let playerIndex = 0;
-    
-    for (let i = 0; i < matches.length; i++) {
-      const match = matches[i];
-      const pos1 = i * 2;
-      const pos2 = i * 2 + 1;
-      
-      // Assign player 1
-      if (seedPositions[pos1] && playerIndex < players.length) {
-        match.player1Id = players[playerIndex++].id;
-      }
-      
-      // Assign player 2
-      if (seedPositions[pos2] && playerIndex < players.length) {
-        match.player2Id = players[playerIndex++].id;
-      }
-    }
-  }
+			return {
+				weekNumber,
+				players,
+				finalRanking: uniqueRankings,
+				date,
+				gameMode: (firstRow.Pelimuoto || firstRow.gameMode || '501') as GameMode
+			};
+		}).sort((a, b) => a.weekNumber - b.weekNumber);
+	}
 
-  findNextMatch(): void {
-    // Reset match victory animation flag
-    this.showMatchVictoryAnimation = false;
-    
-    // Find next incomplete match ordered by round and position
-    const incompleteMatches = this.matches
-      .filter(m => !m.isComplete && m.player1Id !== null && m.player2Id !== null)
-      .sort((a, b) => {
-        if (a.round !== b.round) return a.round - b.round;
-        return a.position - b.position;
-      });
-  
-    this.currentMatch = incompleteMatches.length > 0 ? incompleteMatches[0] : null;
-  
-    // If all matches are complete, we have a winner
-    if (!this.currentMatch && this.isStarted && this.matches.length > 0) {
-      const finalMatch = this.matches[this.matches.length - 1];
-      if (finalMatch && finalMatch.winner) {
-        // Record the tournament winner
-        this.recordTournamentWinner(finalMatch.winner);
-        this.showVictoryAnimation = true;
-      }
-    }
-  }
+	/**
+	 * Generate consistent player IDs based on name and week
+	 * This ensures the same player gets the same ID across different weeks
+	 */
+	private getPlayerIdByName(name: string, weekNumber: number, fallbackId: number): number {
+		// Simple hash function to generate consistent IDs
+		let hash = 0;
+		for (let i = 0; i < name.length; i++) {
+			const char = name.charCodeAt(i);
+			hash = ((hash << 5) - hash) + char;
+			hash = hash & hash; // Convert to 32-bit integer
+		}
+		// Ensure positive ID
+		return Math.abs(hash) || (weekNumber * 1000 + fallbackId);
+	}
 
-  recordTournamentWinner(winnerId: number): void {
-    const winnerName = this.getPlayerName(winnerId);
+	private mergeWeekResults(sheetsResults: WeekResult[], localResults: WeekResult[]): WeekResult[] {
+		const merged = [...localResults]; // Start with local data
+		let newWeeksAdded = 0;
+		let conflictsResolved = 0;
 
-    this.tournamentWinners.push({
-      playerName: winnerName,
-      gameMode: this.gameMode,
-      date: new Date(),
-      playerCount: this.players.length,
-    });
+		sheetsResults.forEach(sheetsResult => {
+			// Check if this week already exists in local data
+			const existingIndex = merged.findIndex(r => r.weekNumber === sheetsResult.weekNumber);
 
-    // Save to localStorage
-    this.saveToLocalStorage();
-  }
+			if (existingIndex === -1) {
+				// Week doesn't exist locally, add from sheets
+				merged.push(sheetsResult);
+				newWeeksAdded++;
+				console.log(`Added week ${sheetsResult.weekNumber} from Google Sheets`);
+			} else {
+				// Week exists - prefer local data but you could add logic to prefer newer data based on date
+				conflictsResolved++;
+				console.log(`Week ${sheetsResult.weekNumber} exists in both sources, keeping local data`);
+			}
+		});
 
-  getInitialScore(): number {
-    switch (this.gameMode) {
-      case '301': return 301;
-      case '501': return 501;
-      case '701': return 701;
-      case 'Cricket': return 0; // Cricket starts from 0 and counts up
-      default: return 501;
-    }
-  }
+		console.log(`Merge complete: ${newWeeksAdded} new weeks added, ${conflictsResolved} conflicts resolved (local data kept)`);
 
-  advancePlayerToNextRound(match: Match): void {
-    if (!match.winner) return;
-  
-    // Skip if this is the final match
-    if (match.round >= this.matches.length - 1) return;
-  
-    const nextRound = match.round + 1;
-    const nextPosition = Math.floor(match.position / 2);
-    
-    const nextMatch = this.matches.find(
-      m => m.round === nextRound && m.position === nextPosition
-    );
-  
-    if (!nextMatch) {
-      console.error(`Could not find next match: round ${nextRound}, position ${nextPosition}`);
-      return;
-    }
-  
-    // Determine if winner goes to player1 or player2 slot
-    if (match.position % 2 === 0) {
-      nextMatch.player1Id = match.winner;
-    } else {
-      nextMatch.player2Id = match.winner;
-    }
-  
-    // Check if both players are set for the next match
-    if (nextMatch.player1Id !== null && nextMatch.player2Id !== null) {
-      // If both players come from byes, we should continue advancing
-      if (this.shouldAutoAdvanceMatch(nextMatch)) {
-        this.autoAdvanceMatch(nextMatch);
-      }
-    }
-    // If only one player is set and the other slot will remain empty
-    else if ((nextMatch.player1Id !== null || nextMatch.player2Id !== null) 
-          && this.isOpponentNeverComing(nextMatch, nextRound)) {
-      this.handleByeAdvancement(nextMatch);
-    }
-  }
-  
-  // Check if a match should be auto-advanced (both players came from byes)
-  private shouldAutoAdvanceMatch(match: Match): boolean {
-    // For now, we'll use a simpler approach: only auto-advance matches with byes
-    // In a real tournament, you might want to randomly select the winner
-    // or use seeding information
-    return false;
-  }
-  
-  // Auto advance a match (skipping actual gameplay)
-  private autoAdvanceMatch(match: Match): void {
-    // For a real tournament, you might want to use seeding to determine the winner
-    // Here we'll just pick player1 for simplicity
-    match.winner = match.player1Id;
-    match.player1Score = this.getInitialScore();
-    match.player2Score = 0;
-    match.player1Legs = Math.ceil(this.bestOfLegs / 2);
-    match.isComplete = true;
-    
-    // Record the match result
-    this.matchHistory.push({
-      matchId: match.id,
-      player1Name: this.getPlayerName(match.player1Id!),
-      player2Name: this.getPlayerName(match.player2Id!),
-      player1Score: match.player1Score,
-      player2Score: match.player2Score || 0,
-      player1Legs: match.player1Legs,
-      player2Legs: match.player2Legs,
-      winnerName: this.getPlayerName(match.winner!),
-      timestamp: new Date(),
-      gameMode: this.gameMode
-    });
-    
-    // Save to localStorage
-    this.saveToLocalStorage();
-    
-    // Advance to next round
-    this.advancePlayerToNextRound(match);
-  }
-  
-  // Check if opponent will never arrive (bye situation)
-  private isOpponentNeverComing(match: Match, round: number): boolean {
-    const position = match.position;
-    const isPlayer1Missing = match.player1Id === null;
-    const isPlayer2Missing = match.player2Id === null;
-    
-    // Determine which previous match should feed into this slot
-    const prevRound = round - 1;
-    const prevPos1 = position * 2;
-    const prevPos2 = position * 2 + 1;
-    
-    const prevMatch = isPlayer1Missing 
-      ? this.matches.find(m => m.round === prevRound && m.position === prevPos1)
-      : this.matches.find(m => m.round === prevRound && m.position === prevPos2);
-    
-    // If previous match doesn't exist or is complete with no winner, 
-    // no opponent is coming
-    return !prevMatch || (prevMatch.isComplete && prevMatch.winner === null);
-  }
-  
-  // Handle case where player advances without opponent (bye)
-  private handleByeAdvancement(match: Match): void {
-    // Determine which player gets the bye
-    const advancingPlayer = match.player1Id !== null ? match.player1Id : match.player2Id;
-    if (!advancingPlayer) return;
-    
-    // Mark match as complete with advancing player as winner
-    match.winner = advancingPlayer;
-    match.player1Score = match.player1Id === advancingPlayer ? this.getInitialScore() : 0;
-    match.player2Score = match.player2Id === advancingPlayer ? this.getInitialScore() : 0;
-    match.player1Legs = match.player1Id === advancingPlayer ? Math.ceil(this.bestOfLegs / 2) : 0;
-    match.player2Legs = match.player2Id === advancingPlayer ? Math.ceil(this.bestOfLegs / 2) : 0;
-    match.isComplete = true;
-    
-    // Record match in history
-    this.matchHistory.push({
-      matchId: match.id,
-      player1Name: match.player1Id ? this.getPlayerName(match.player1Id) : 'Bye',
-      player2Name: match.player2Id ? this.getPlayerName(match.player2Id) : 'Bye',
-      player1Score: match.player1Score || 0,
-      player2Score: match.player2Score || 0,
-      player1Legs: match.player1Legs,
-      player2Legs: match.player2Legs,
-      winnerName: this.getPlayerName(advancingPlayer),
-      timestamp: new Date(),
-      gameMode: this.gameMode
-    });
-    
-    // Save to localStorage
-    this.saveToLocalStorage();
-    
-    // Advance player to next round
-    this.advancePlayerToNextRound(match);
-  }
+		// Sort by week number
+		return merged.sort((a, b) => a.weekNumber - b.weekNumber);
+	}
 
-  undoLastMatch(): boolean {
-    if (this.matchHistory.length === 0) return false;
+	/**
+	 * Configure Google Sheets integration
+	 */
+	configureGoogleSheets(spreadsheetId: string, apiKey?: string): void {
+		this.sheetsService.setConfig({
+			spreadsheetId,
+			apiKey
+		});
+	}
 
-    // Get the last match from history
-    const lastResult = this.matchHistory.pop()!;
+	saveWeekResults(): void {
+		try {
+			localStorage.setItem(RESULTS_KEY, JSON.stringify(this.weekResults));
+		} catch (error) {
+			console.error('Error saving data:', error);
+		}
+	}
 
-    // Save to localStorage after removing the match
-    this.saveToLocalStorage();
+	private generateUUID(): string {
+		return 'xxxx-xxxx-4xxx-yxxx'.replace(/[xy]/g, function(c) {
+			const r = Math.random() * 16 | 0;
+			const v = c == 'x' ? r : (r & 0x3 | 0x8);
+			return v.toString(16);
+		});
+	}
 
-    // Find the match in our matches array
-    const match = this.matches.find(m => m.id === lastResult.matchId);
-    if (!match) return false;
+	createTournament(): string {
+		const uuid = this.generateUUID();
+		this.tournamentId = uuid;
+		this.saveTournamentState();
+		return uuid;
+	}
 
-    // Reset the match
-    match.isComplete = false;
-    match.winner = null;
-    match.player1Score = null;
-    match.player2Score = null;
-    match.player1Legs = 0;
-    match.player2Legs = 0;
+	loadTournament(uuid: string): boolean {
+		try {
+			const saved = localStorage.getItem(TOURNAMENTS_KEY);
 
-    // Also need to clear the next round match
-    const nextRound = match.round + 1;
-    const nextPosition = Math.floor(match.position / 2);
-    const nextMatch = this.matches.find(
-      m => m.round === nextRound && m.position === nextPosition
-    );
+			if (saved) {
+				const tournaments = JSON.parse(saved);
+				const tournament = tournaments[uuid];
 
-    if (nextMatch) {
-      // Determine which slot the winner was in
-      if (match.position % 2 === 0) {
-        nextMatch.player1Id = null;
-      } else {
-        nextMatch.player2Id = null;
-      }
+				if (tournament) {
+					// Restore tournament state
+					this.players = tournament.players || [];
+					this.matches = tournament.matches || [];
+					this.standings = tournament.standings || [];
+					this.finalists = tournament.finalists || [];
+					this.currentMatch = tournament.currentMatch;
+					this.isStarted = tournament.isStarted || false;
+					this.gameMode = tournament.gameMode;
+					this.bestOfLegs = tournament.bestOfLegs;
+					this.weekNumber = tournament.weekNumber;
+					this.tournamentId = uuid;
+					this.tournamentType = tournament.tournamentType;
+					this.currentPhase = tournament.currentPhase;
+					this.showMatchWinner = false; // Always reset animation states
+					this.showRoulette = tournament.showRoulette || false;
+					this.winnerName = tournament.winnerName || '';
+					this.requiresTiebreaker = tournament.requiresTiebreaker || false;
+					this.tiebreakerPlayers = tournament.tiebreakerPlayers || [];
+					this.tiebreakerScores = tournament.tiebreakerScores || {};
+					this.tiebreakerUIState = tournament.tiebreakerUIState || {
+						currentRoundScores: {},
+						showResults: false,
+						results: [],
+						stillTied: false
+					};
+					this.tournamentCompleted = tournament.tournamentCompleted || false;
 
-      // If the next match was already complete, we need to undo that too
-      if (nextMatch.isComplete) {
-        return this.undoLastMatch(); // Recursive call to undo the next match too
-      }
-    }
+					// Ensure tiebreaker is properly initialized if we're in tiebreaker mode
+					if (this.requiresTiebreaker && this.tiebreakerPlayers.length > 0) {
+						this.initializeTiebreaker();
+					}
 
-    // Reset current match
-    this.currentMatch = match;
-    
-    // Reset animation flags
-    this.showMatchVictoryAnimation = false;
+					// Safety check: if no current match but incomplete matches exist, find next match
+					if (!this.currentMatch && this.isStarted && !this.requiresTiebreaker && !this.tournamentCompleted) {
+						const incompleteMatch = this.matches.find(m => !m.isComplete);
+						if (incompleteMatch) {
+							this.currentMatch = incompleteMatch;
+						}
+					}
 
-    return true;
-  }
+					return true;
+				}
+			}
+		} catch (error) {
+			console.error('Error loading tournament:', error);
+		}
+		return false;
+	}
 
-  getPlayerName(playerId: number): string {
-    const player = this.players.find(p => p.id === playerId);
-    return player ? player.name : 'Unknown';
-  }
+	saveTournamentState(): void {
+		if (!this.tournamentId) return;
 
-  getRound(roundIndex: number, plural = false): string {
-    const rounds = Math.ceil(Math.log2(this.players.length || 2));
-    
-    // If we're at the final round
-    if (roundIndex === rounds - 1) {
-      return 'Finaali';
-    } 
-    // If we're at the semifinals
-    else if (roundIndex === rounds - 2) {
-      return plural ? 'Välierät' : 'Välierä';
-    } 
-    // If we're at the quarterfinals
-    else if (roundIndex === rounds - 3) {
-      return plural ? 'Puolivälierät' : 'Puolivälierä';
-    } 
-    // Other earlier rounds
-    else {
-      return `${roundIndex + 1}. kierros`;
-    }
-  }
+		try {
+			const saved = localStorage.getItem(TOURNAMENTS_KEY);
+			const tournaments = saved ? JSON.parse(saved) : {};
+
+			tournaments[this.tournamentId] = {
+				players: this.players,
+				matches: this.matches,
+				standings: this.standings,
+				finalists: this.finalists,
+				currentMatch: this.currentMatch,
+				isStarted: this.isStarted,
+				gameMode: this.gameMode,
+				bestOfLegs: this.bestOfLegs,
+				weekNumber: this.weekNumber,
+				tournamentType: this.tournamentType,
+				currentPhase: this.currentPhase,
+				winnerName: this.winnerName,
+				showRoulette: this.showRoulette,
+				requiresTiebreaker: this.requiresTiebreaker,
+				tiebreakerPlayers: this.tiebreakerPlayers,
+				tiebreakerScores: this.tiebreakerScores,
+				tiebreakerUIState: this.tiebreakerUIState,
+				tournamentCompleted: this.tournamentCompleted,
+				lastUpdated: new Date(),
+			};
+
+			localStorage.setItem(TOURNAMENTS_KEY, JSON.stringify(tournaments));
+		} catch (error) {
+			console.error('Error saving tournament state:', error);
+		}
+	}
+
+	deleteTournament(uuid: string): void {
+		try {
+			const saved = localStorage.getItem(TOURNAMENTS_KEY);
+			if (saved) {
+				const tournaments = JSON.parse(saved);
+				delete tournaments[uuid];
+				localStorage.setItem(TOURNAMENTS_KEY, JSON.stringify(tournaments));
+			}
+		} catch (error) {
+			console.error('Error deleting tournament:', error);
+		}
+	}
+
+	reset(): void {
+		this.players = [];
+		this.matches = [];
+		this.standings = [];
+		this.finalists = [];
+		this.currentMatch = null;
+		this.isStarted = false;
+		this.currentPhase = 'group';
+		this.showMatchWinner = false;
+		this.showRoulette = false;
+		this.winnerName = '';
+		this.tournamentId = null;
+		this.requiresTiebreaker = false;
+		this.tiebreakerPlayers = [];
+		this.tiebreakerScores = {};
+		this.tournamentCompleted = false;
+	}
+
+	hasResults(): boolean {
+		return this.weekResults.length > 0;
+	}
+
+	register(playerNames: string[], gameMode: GameMode, bestOfLegs: number, weekNumber: number): string {
+		this.reset();
+		this.gameMode = gameMode;
+		this.bestOfLegs = bestOfLegs;
+		this.weekNumber = weekNumber;
+
+		this.players = playerNames.map((name, index) => ({
+			id: index + 1,
+			name: name.trim()
+		}));
+
+		if (this.players.length < 3) {
+			throw new Error('Vähintään 3 pelaajaa tarvitaan');
+		}
+
+		this.determineTournamentType();
+
+		const uuid = this.createTournament();
+
+		this.setupTournament();
+
+		this.showRoulette = true;
+		this.saveTournamentState();
+		return uuid;
+	}
+
+	private determineTournamentType(): void {
+		if (this.players.length <= 5) {
+			this.tournamentType = 'round-robin';
+		} else if (this.players.length <= 8) {
+			this.tournamentType = 'groups';
+		} else {
+			this.tournamentType = 'groups-3';
+		}
+	}
+
+	setupTournament(): void {
+		if (this.tournamentType === 'round-robin') {
+			this.setupRoundRobin();
+		} else if (this.tournamentType === 'groups') {
+			this.setupGroups();
+		} else {
+			this.setupThreeGroups();
+		}
+		this.saveTournamentState();
+	}
+
+	private setupRoundRobin(): void {
+		this.matches = [];
+		let matchId = 1;
+
+		// Create all matches first
+		const allMatches: {player1Id: number, player2Id: number}[] = [];
+		for (let i = 0; i < this.players.length; i++) {
+			for (let j = i + 1; j < this.players.length; j++) {
+				allMatches.push({
+					player1Id: this.players[i].id,
+					player2Id: this.players[j].id
+				});
+			}
+		}
+
+		// Sort matches to alternate players better
+		const sortedMatches = this.alternateMatchOrder(allMatches);
+
+		// Create match objects
+		sortedMatches.forEach(match => {
+			this.matches.push({
+				id: matchId++,
+				player1Id: match.player1Id,
+				player2Id: match.player2Id,
+				player1Legs: 0,
+				player2Legs: 0,
+				winner: null,
+				isComplete: false,
+				round: 'group'
+			});
+		});
+
+		this.standings = this.players.map(player => ({
+			playerId: player.id,
+			playerName: player.name,
+			wins: 0,
+			losses: 0,
+			legDifference: 0,
+			points: 0,
+			group: 1
+		}));
+	}
+
+	private setupGroups(): void {
+		this.matches = [];
+		const shuffled = [...this.players].sort(() => Math.random() - 0.5);
+		const group1Size = Math.ceil(shuffled.length / 2);
+
+		shuffled.forEach((player, index) => {
+			player.group = index < group1Size ? 1 : 2;
+		});
+
+		let matchId = 1;
+		const allGroupMatches: {player1Id: number, player2Id: number, group: number}[] = [];
+
+		// Create all matches for each group
+		[1, 2].forEach(groupNum => {
+			const groupPlayers = shuffled.filter(p => p.group === groupNum);
+			const groupMatches: {player1Id: number, player2Id: number}[] = [];
+
+			for (let i = 0; i < groupPlayers.length; i++) {
+				for (let j = i + 1; j < groupPlayers.length; j++) {
+					groupMatches.push({
+						player1Id: groupPlayers[i].id,
+						player2Id: groupPlayers[j].id
+					});
+				}
+			}
+
+			// Sort matches within each group for better alternation
+			const sortedGroupMatches = this.alternateMatchOrder(groupMatches);
+			sortedGroupMatches.forEach(match => {
+				allGroupMatches.push({...match, group: groupNum});
+			});
+		});
+
+		// Interleave matches between groups for better overall flow
+		const interleavedMatches = this.interleaveGroupMatches(allGroupMatches);
+
+		// Create match objects
+		interleavedMatches.forEach(match => {
+			this.matches.push({
+				id: matchId++,
+				player1Id: match.player1Id,
+				player2Id: match.player2Id,
+				player1Legs: 0,
+				player2Legs: 0,
+				winner: null,
+				isComplete: false,
+				round: 'group',
+				group: match.group
+			});
+		});
+
+		this.standings = this.players.map(player => ({
+			playerId: player.id,
+			playerName: player.name,
+			wins: 0,
+			losses: 0,
+			legDifference: 0,
+			points: 0,
+			group: player.group || 1
+		}));
+	}
+
+	private setupThreeGroups(): void {
+		this.matches = [];
+		const shuffled = [...this.players].sort(() => Math.random() - 0.5);
+		const playersPerGroup = Math.ceil(shuffled.length / 3);
+
+		shuffled.forEach((player, index) => {
+			player.group = Math.floor(index / playersPerGroup) + 1;
+		});
+
+		let matchId = 1;
+		const allGroupMatches: {player1Id: number, player2Id: number, group: number}[] = [];
+
+		// Create all matches for each group
+		[1, 2, 3].forEach(groupNum => {
+			const groupPlayers = shuffled.filter(p => p.group === groupNum);
+			const groupMatches: {player1Id: number, player2Id: number}[] = [];
+
+			for (let i = 0; i < groupPlayers.length; i++) {
+				for (let j = i + 1; j < groupPlayers.length; j++) {
+					groupMatches.push({
+						player1Id: groupPlayers[i].id,
+						player2Id: groupPlayers[j].id
+					});
+				}
+			}
+
+			// Sort matches within each group for better alternation
+			const sortedGroupMatches = this.alternateMatchOrder(groupMatches);
+			sortedGroupMatches.forEach(match => {
+				allGroupMatches.push({...match, group: groupNum});
+			});
+		});
+
+		// Interleave matches between groups for better overall flow
+		const interleavedMatches = this.interleaveGroupMatches(allGroupMatches);
+
+		// Create match objects
+		interleavedMatches.forEach(match => {
+			this.matches.push({
+				id: matchId++,
+				player1Id: match.player1Id,
+				player2Id: match.player2Id,
+				player1Legs: 0,
+				player2Legs: 0,
+				winner: null,
+				isComplete: false,
+				round: 'group',
+				group: match.group
+			});
+		});
+
+		this.standings = this.players.map(player => ({
+			playerId: player.id,
+			playerName: player.name,
+			wins: 0,
+			losses: 0,
+			legDifference: 0,
+			points: 0,
+			group: player.group || 1
+		}));
+	}
+
+	private alternateMatchOrder(matches: {player1Id: number, player2Id: number}[]): {player1Id: number, player2Id: number}[] {
+		const result: {player1Id: number, player2Id: number}[] = [];
+		const remaining = [...matches];
+		const playerLastMatchIndex: {[playerId: number]: number} = {};
+
+		while (remaining.length > 0) {
+			// Find the best match to add next - one where both players haven't played recently
+			let bestMatchIndex = 0;
+			let bestScore = -1;
+
+			for (let i = 0; i < remaining.length; i++) {
+				const match = remaining[i];
+				const player1LastIndex = playerLastMatchIndex[match.player1Id] ?? -10;
+				const player2LastIndex = playerLastMatchIndex[match.player2Id] ?? -10;
+
+				// Score based on how long ago each player last played (higher is better)
+				const score = (result.length - player1LastIndex) + (result.length - player2LastIndex);
+
+				if (score > bestScore) {
+					bestScore = score;
+					bestMatchIndex = i;
+				}
+			}
+
+			// Add the best match
+			const selectedMatch = remaining.splice(bestMatchIndex, 1)[0];
+			result.push(selectedMatch);
+			playerLastMatchIndex[selectedMatch.player1Id] = result.length - 1;
+			playerLastMatchIndex[selectedMatch.player2Id] = result.length - 1;
+		}
+
+		return result;
+	}
+
+	private interleaveGroupMatches(groupMatches: {player1Id: number, player2Id: number, group: number}[]): {player1Id: number, player2Id: number, group: number}[] {
+		// Group matches by group number
+		const matchesByGroup: {[group: number]: {player1Id: number, player2Id: number, group: number}[]} = {};
+		groupMatches.forEach(match => {
+			if (!matchesByGroup[match.group]) {
+				matchesByGroup[match.group] = [];
+			}
+			matchesByGroup[match.group].push(match);
+		});
+
+		const result: {player1Id: number, player2Id: number, group: number}[] = [];
+		const groups = Object.keys(matchesByGroup).map(Number).sort();
+		let currentGroupIndex = 0;
+
+		// Interleave matches from different groups
+		while (Object.values(matchesByGroup).some(matches => matches.length > 0)) {
+			const currentGroup = groups[currentGroupIndex];
+			if (matchesByGroup[currentGroup] && matchesByGroup[currentGroup].length > 0) {
+				result.push(matchesByGroup[currentGroup].shift()!);
+			}
+			currentGroupIndex = (currentGroupIndex + 1) % groups.length;
+		}
+
+		return result;
+	}
+
+	startTournament(): void {
+		this.showRoulette = false;
+		this.isStarted = true;
+		this.findNextMatch();
+		this.saveTournamentState();
+	}
+
+	findNextMatch(): void {
+		if (this.showMatchWinner) return;
+
+		if (this.currentPhase === 'group') {
+			const nextMatch = this.matches.find(m => !m.isComplete && m.round === 'group');
+			if (nextMatch) {
+				this.currentMatch = nextMatch;
+				return;
+			}
+
+			this.currentMatch = null;
+			if (this.tournamentType === 'round-robin') {
+				// Check for ties that need tiebreaker
+				if (this.hasUnresolvableTie()) {
+					// Tournament stuck waiting for tiebreaker resolution
+					this.initializeTiebreaker();
+					this.saveTournamentState();
+					return;
+				}
+
+				// For 3-player tournaments, complete immediately since all matches are final
+				if (this.players.length === 3) {
+					this.completeTournament();
+					return;
+				}
+			}
+
+			this.transitionPhase();
+		} else if (this.currentPhase === 'playoff') {
+			const nextMatch = this.matches.find(m => !m.isComplete && m.round === 'playoff');
+			if (nextMatch) {
+				this.currentMatch = nextMatch;
+				return;
+			}
+
+			this.currentMatch = null;
+			this.currentPhase = 'final';
+			this.createFinalMatch();
+		} else if (this.currentPhase === 'final') {
+			const nextMatch = this.matches.find(m => !m.isComplete && m.round === 'final');
+			if (nextMatch) {
+				this.currentMatch = nextMatch;
+				return;
+			}
+
+			this.currentMatch = null;
+			this.completeTournament();
+		}
+	}
+
+	private transitionPhase(): void {
+		this.updateStandings();
+
+		// Check for group-level tiebreakers before proceeding
+		if (this.requiresGroupTiebreakers()) {
+			return; // Wait for tiebreaker resolution
+		}
+
+		if (this.tournamentType === 'round-robin') {
+			this.createFinals(3);
+		} else if (this.tournamentType === 'groups') {
+			this.createPlayoff();
+		} else {
+			this.createThreeGroupFinals();
+		}
+	}
+
+	private createFinals(count: number): void {
+		const sorted = this.getSortedStandings();
+		this.finalists = sorted.slice(0, count).map(s =>
+			this.players.find(p => p.id === s.playerId)!
+		);
+
+		if (this.finalists.length === 3) {
+			const maxId = this.matches.length > 0 ? Math.max(...this.matches.map(m => m.id)) : 0;
+			this.matches.push({
+				id: maxId + 1,
+				player1Id: this.finalists[0].id,
+				player2Id: this.finalists[1].id,
+				player1Legs: 0,
+				player2Legs: 0,
+				winner: null,
+				isComplete: false,
+				round: 'final',
+				player3Id: this.finalists[2].id,
+				player3Legs: 0
+			});
+		}
+
+		this.currentPhase = 'final';
+		this.saveTournamentState();
+		this.findNextMatch();
+	}
+
+	private createPlayoff(): void {
+		const group1 = this.getGroupStandings(1);
+		const group2 = this.getGroupStandings(2);
+
+		this.finalists = [
+			this.players.find(p => p.id === group1[0].playerId)!,
+			this.players.find(p => p.id === group2[0].playerId)!
+		];
+
+		if (group1[1] && group2[1]) {
+			const maxId = this.matches.length > 0 ? Math.max(...this.matches.map(m => m.id)) : 0;
+			this.matches.push({
+				id: maxId + 1,
+				player1Id: group1[1].playerId,
+				player2Id: group2[1].playerId,
+				player1Legs: 0,
+				player2Legs: 0,
+				winner: null,
+				isComplete: false,
+				round: 'playoff'
+			});
+		}
+
+		this.currentPhase = 'playoff';
+		this.saveTournamentState();
+		this.findNextMatch();
+	}
+
+	private createThreeGroupFinals(): void {
+		const group1 = this.getGroupStandings(1);
+		const group2 = this.getGroupStandings(2);
+		const group3 = this.getGroupStandings(3);
+
+		this.finalists = [
+			this.players.find(p => p.id === group1[0].playerId)!,
+			this.players.find(p => p.id === group2[0].playerId)!,
+			this.players.find(p => p.id === group3[0].playerId)!
+		];
+
+		this.currentPhase = 'final';
+		this.saveTournamentState();
+		this.createFinalMatch();
+	}
+
+	private createFinalMatch(): void {
+		if (this.finalists.length === 3) {
+			const maxId = this.matches.length > 0 ? Math.max(...this.matches.map(m => m.id)) : 0;
+			this.matches.push({
+				id: maxId + 1,
+				player1Id: this.finalists[0].id,
+				player2Id: this.finalists[1].id,
+				player1Legs: 0,
+				player2Legs: 0,
+				winner: null,
+				isComplete: false,
+				round: 'final',
+				player3Id: this.finalists[2].id,
+				player3Legs: 0
+			});
+		}
+		this.saveTournamentState();
+		this.findNextMatch();
+	}
+
+	completeMatch(winnerId: number): void {
+		if (!this.currentMatch) return;
+
+		this.currentMatch.winner = winnerId;
+		this.currentMatch.isComplete = true;
+		this.winnerName = this.getPlayerName(winnerId);
+
+		if (this.currentMatch.round === 'playoff') {
+			this.finalists.push(this.players.find(p => p.id === winnerId)!);
+		}
+
+		this.updateStandings();
+
+		// Check if this completes the tournament
+		if (this.isTournamentComplete()) {
+			this.completeTournament();
+			return;
+		}
+
+		this.showMatchWinner = true;
+		setTimeout(() => {
+			this.showMatchWinner = false;
+			this.findNextMatch();
+		}, 3000);
+	}
+
+	updateStandings(): void {
+		this.standings.forEach(s => {
+			s.wins = 0;
+			s.losses = 0;
+			s.legDifference = 0;
+			s.points = 0;
+		});
+
+		this.matches.filter(m => m.isComplete).forEach(match => {
+			const p1 = this.standings.find(s => s.playerId === match.player1Id)!;
+			const p2 = this.standings.find(s => s.playerId === match.player2Id)!;
+
+			p1.legDifference += match.player1Legs - match.player2Legs;
+			p2.legDifference += match.player2Legs - match.player1Legs;
+
+			if (match.winner === match.player1Id) {
+				p1.wins++;
+				p1.points += 3;
+				p2.losses++;
+			} else {
+				p2.wins++;
+				p2.points += 3;
+				p1.losses++;
+			}
+		});
+
+		this.saveTournamentState();
+	}
+
+	private completeTournament(): void {
+		this.updateStandings();
+
+		// For 3-way finals, use the finish order from the final match
+		let finalRanking;
+		const finalMatch = this.matches.find(m => m.round === 'final' && m.isComplete);
+
+		if (finalMatch && finalMatch.finishOrder && finalMatch.finishOrder.length >= 2) {
+			// Build ranking based on finish order for 3-way final
+			const rankedPlayers = [];
+
+			// Add finished players in order
+			finalMatch.finishOrder.forEach(playerId => {
+				rankedPlayers.push({
+					playerId,
+					playerName: this.getPlayerName(playerId)
+				});
+			});
+
+			// Add any remaining player (who didn't finish) as last
+			const allFinalPlayers = [finalMatch.player1Id, finalMatch.player2Id, finalMatch.player3Id!];
+			const unfinishedPlayer = allFinalPlayers.find(id => !finalMatch.finishOrder!.includes(id));
+			if (unfinishedPlayer) {
+				rankedPlayers.push({
+					playerId: unfinishedPlayer,
+					playerName: this.getPlayerName(unfinishedPlayer)
+				});
+			}
+
+			finalRanking = rankedPlayers.map((player, index) => ({
+				playerId: player.playerId,
+				playerName: player.playerName,
+				position: index + 1,
+				points: [5, 3, 1, 0][index] || 0
+			}));
+		} else {
+			// Use regular standings for non-3-way finals
+			finalRanking = this.getSortedStandings().map((s, index) => ({
+				playerId: s.playerId,
+				playerName: s.playerName,
+				position: index + 1,
+				points: [5, 3, 1, 0][index] || 0
+			}));
+		}
+
+		this.weekResults.push({
+			weekNumber: this.weekNumber,
+			players: [...this.players],
+			finalRanking,
+			date: new Date(),
+			gameMode: this.gameMode
+		});
+
+		this.saveWeekResults();
+
+		// Mark tournament as completed
+		this.tournamentCompleted = true;
+		this.saveTournamentState();
+
+		// Delete the tournament from active tournaments since it's complete
+		if (this.tournamentId) {
+			setTimeout(() => {
+				this.deleteTournament(this.tournamentId!);
+			}, 1000);
+		}
+	}
+
+	isTournamentComplete(): boolean {
+		if (this.tournamentType === 'round-robin' && this.players.length === 3) {
+			// For 3 players, complete when all group matches are done
+			const groupMatches = this.matches.filter(m => m.round === 'group');
+			const allMatchesComplete = groupMatches.length > 0 && groupMatches.every(m => m.isComplete);
+
+			if (allMatchesComplete) {
+				// Check for ties that require 9-dart tiebreaker
+				if (this.hasUnresolvableTie()) {
+					return false; // Tournament not complete until tie is resolved
+				}
+			}
+
+			return allMatchesComplete;
+		}
+
+		if (this.currentPhase === 'final') {
+			const finalMatches = this.matches.filter(m => m.round === 'final');
+			return finalMatches.length > 0 && finalMatches.every(m => m.isComplete);
+		}
+
+		return false;
+	}
+
+	private requiresGroupTiebreakers(): boolean {
+		// For group-based tournaments, check each group for unresolvable ties
+		if (this.tournamentType === 'groups' || this.tournamentType === 'groups-3') {
+			const groupCount = this.tournamentType === 'groups-3' ? 3 : 2;
+
+			for (let groupNum = 1; groupNum <= groupCount; groupNum++) {
+				if (this.hasGroupTie(groupNum)) {
+					return true;
+				}
+			}
+		} else if (this.tournamentType === 'round-robin' && this.players.length === 3) {
+			// For 3-player round-robin, check for overall tie
+			return this.hasUnresolvableTie();
+		}
+
+		return false;
+	}
+
+	private hasGroupTie(groupNum: number): boolean {
+		const groupStandings = this.getGroupStandings(groupNum);
+
+		// Check for ties that can't be resolved by head-to-head
+		const tiedGroups = this.findUnresolvableTies(groupStandings);
+
+		if (tiedGroups.length > 0) {
+			// Set up tiebreaker for this group
+			this.requiresTiebreaker = true;
+			this.tiebreakerPlayers = tiedGroups.map(s =>
+				this.players.find(p => p.id === s.playerId)!
+			);
+			this.initializeTiebreaker();
+			this.saveTournamentState();
+			return true;
+		}
+
+		return false;
+	}
+
+	private findUnresolvableTies(standings: Standing[]): Standing[] {
+		// Group players by points and leg difference
+		const groups: { [key: string]: Standing[] } = {};
+
+		standings.forEach(standing => {
+			const key = `${standing.points}-${standing.legDifference}`;
+			if (!groups[key]) {
+				groups[key] = [];
+			}
+			groups[key].push(standing);
+		});
+
+		// Find the highest scoring group that has ties
+		const sortedGroupKeys = Object.keys(groups).sort((a, b) => {
+			const [aPoints, aLegDiff] = a.split('-').map(Number);
+			const [bPoints, bLegDiff] = b.split('-').map(Number);
+			if (aPoints !== bPoints) return bPoints - aPoints;
+			return bLegDiff - aLegDiff;
+		});
+
+		for (const key of sortedGroupKeys) {
+			const group = groups[key];
+			if (group.length >= 2) {
+				// Check if head-to-head can resolve the tie for 2-player ties
+				if (group.length === 2 && this.canResolveByHeadToHead(group[0], group[1])) {
+					continue; // This tie can be resolved by head-to-head
+				}
+
+				// Unresolvable tie found (3+ players or 2 players with no head-to-head resolution)
+				return group;
+			}
+		}
+		return [];
+	}
+
+	private canResolveByHeadToHead(player1: Standing, player2: Standing): boolean {
+		const headToHeadResult = this.getHeadToHeadResult(player1.playerId, player2.playerId);
+		return headToHeadResult !== null;
+	}
+
+	private hasUnresolvableTie(): boolean {
+		this.updateStandings();
+		const sorted = this.getSortedStandings();
+
+		// Use the same logic as group tiebreakers to find any unresolvable ties
+		const tiedPlayers = this.findUnresolvableTies(sorted);
+
+		if (tiedPlayers.length > 0) {
+			// Set up tiebreaker
+			this.requiresTiebreaker = true;
+			this.tiebreakerPlayers = tiedPlayers.map(s =>
+				this.players.find(p => p.id === s.playerId)!
+			);
+			return true;
+		}
+
+		return false;
+	}
+
+	initializeTiebreaker(): void {
+		// Initialize core tiebreaker data if not present
+		if (!this.tiebreakerScores || Object.keys(this.tiebreakerScores).length === 0) {
+			this.tiebreakerScores = {};
+			this.tiebreakerPlayers.forEach(player => {
+				this.tiebreakerScores[player.id] = [];
+			});
+		}
+
+		// Initialize UI state only if it doesn't exist or is empty
+		// This preserves state during page refreshes
+		const hasExistingUIState = this.tiebreakerUIState.currentRoundScores &&
+			Object.keys(this.tiebreakerUIState.currentRoundScores).length > 0;
+
+		if (!hasExistingUIState) {
+			this.tiebreakerUIState = {
+				currentRoundScores: {},
+				showResults: false,
+				results: [],
+				stillTied: false
+			};
+
+			this.tiebreakerPlayers.forEach(player => {
+				this.tiebreakerUIState.currentRoundScores[player.id] = new Array(9).fill(0);
+			});
+		}
+	}
+
+	addTiebreakerScore(playerId: number, score: number): void {
+		if (this.tiebreakerScores[playerId]) {
+			this.tiebreakerScores[playerId].push(score);
+		}
+	}
+
+	// Methods for tiebreaker UI state management
+	updateTiebreakerUIState(uiState: {
+		currentRoundScores?: { [playerId: number]: number[] },
+		showResults?: boolean,
+		results?: { playerName: string; total: number }[],
+		stillTied?: boolean
+	}): void {
+		this.tiebreakerUIState = { ...this.tiebreakerUIState, ...uiState };
+		this.saveTournamentState();
+	}
+
+	getTiebreakerTotals(): { playerId: number; playerName: string; total: number }[] {
+		return this.tiebreakerPlayers.map(player => ({
+			playerId: player.id,
+			playerName: player.name,
+			total: this.tiebreakerScores[player.id]?.reduce((sum, score) => sum + score, 0) || 0
+		})).sort((a, b) => b.total - a.total);
+	}
+
+	resolveTiebreaker(): void {
+		const totals = this.getTiebreakerTotals();
+
+		// Check if there's still a tie
+		if (totals.length >= 2 && totals[0].total === totals[1].total) {
+			// Still tied, need another round
+			this.tiebreakerPlayers.forEach(player => {
+				this.tiebreakerScores[player.id] = [];
+			});
+			return;
+		}
+
+		// Tie resolved
+		this.requiresTiebreaker = false;
+		this.tiebreakerPlayers = [];
+		this.tiebreakerScores = {};
+		// Clear UI state as well
+		this.tiebreakerUIState = {
+			currentRoundScores: {},
+			showResults: false,
+			results: [],
+			stillTied: false
+		};
+		this.saveTournamentState();
+
+		// Update standings to reflect tiebreaker results
+		// The tiebreaker winner should be ranked higher in the final standings
+		this.applyTiebreakerResults(totals);
+
+		// Continue with tournament progression
+		if (this.tournamentType === 'round-robin' && this.players.length === 3) {
+			this.completeTournament();
+		} else {
+			// For all other cases, continue to next phase
+			this.transitionPhase();
+		}
+	}
+
+	private applyTiebreakerResults(totals: { playerId: number; playerName: string; total: number }[]): void {
+		// Update the standings to reflect tiebreaker order
+		// This is a simplified approach - in reality you might want to store tiebreaker results separately
+		// For now, we'll adjust the standings order based on tiebreaker results
+		const tiebreakerWinnerIds = totals.map(t => t.playerId);
+
+		// Resort standings to put tiebreaker winners in correct order
+		this.standings = this.standings.sort((a, b) => {
+			const aIndex = tiebreakerWinnerIds.indexOf(a.playerId);
+			const bIndex = tiebreakerWinnerIds.indexOf(b.playerId);
+
+			// If both are in tiebreaker, sort by tiebreaker order
+			if (aIndex !== -1 && bIndex !== -1) {
+				return aIndex - bIndex;
+			}
+
+			// If only one is in tiebreaker, use normal sorting
+			if (aIndex !== -1) return -1;
+			if (bIndex !== -1) return 1;
+
+			// Neither in tiebreaker, use normal sorting
+			if (a.points !== b.points) return b.points - a.points;
+			if (a.legDifference !== b.legDifference) return b.legDifference - a.legDifference;
+			return 0;
+		});
+	}
+
+	setCurrentMatch(matchId: number): void {
+		const match = this.matches.find(m => m.id === matchId);
+		if (match) {
+			this.currentMatch = match;
+			this.saveTournamentState();
+		}
+	}
+
+	canEditMatch(match: Match): boolean {
+		// Can edit any match except final matches that are complete
+		return !(match.round === 'final' && match.isComplete);
+	}
+
+	getSortedStandings(): Standing[] {
+		return [...this.standings].sort((a, b) => {
+			// First by points
+			if (a.points !== b.points) return b.points - a.points;
+
+			// If tied, check head-to-head for 2-player ties
+			if (a.points === b.points && this.standings.filter(s => s.points === a.points).length === 2) {
+				const headToHead = this.getHeadToHeadResult(a.playerId, b.playerId);
+				if (headToHead !== null) return headToHead;
+			}
+
+			// Then by leg difference
+			if (b.legDifference !== a.legDifference) return b.legDifference - a.legDifference;
+
+			// If still tied, requires manual tiebreaker (9 dart challenge)
+			// For now, maintain current order as manual resolution needed
+			return 0;
+		});
+	}
+
+	getGroupStandings(groupNum: number): Standing[] {
+		return this.getSortedStandings().filter(s => s.group === groupNum);
+	}
+
+	private getHeadToHeadResult(player1Id: number, player2Id: number): number | null {
+		const match = this.matches.find(m =>
+			m.isComplete &&
+			((m.player1Id === player1Id && m.player2Id === player2Id) ||
+			 (m.player1Id === player2Id && m.player2Id === player1Id))
+		);
+
+		if (!match) return null;
+
+		// Return negative for player1 wins, positive for player2 wins
+		if (match.winner === player1Id) return -1;
+		if (match.winner === player2Id) return 1;
+		return null;
+	}
+
+	getPlayerName(playerId: number): string {
+		return this.players.find(p => p.id === playerId)?.name || 'Unknown';
+	}
+
+	getCurrentPhaseDescription(): string {
+		switch (this.currentPhase) {
+			case 'group':
+				if (this.tournamentType === 'round-robin') return 'Karsinnat';
+				if (this.tournamentType === 'groups-3') return 'Lohkopelit (3 lohkoa)';
+				return 'Lohkopelit';
+			case 'playoff': return 'Karsinta finaaliin';
+			case 'final': return 'Finaali';
+			default: return '';
+		}
+	}
+
+	is3WayFinal(): boolean {
+		return this.currentMatch?.player3Id !== undefined;
+	}
+
+	getSeasonStandings(): SeasonStanding[] {
+		const playerStats: { [name: string]: SeasonStanding } = {};
+
+		this.weekResults.forEach(week => {
+			week.finalRanking.forEach(ranking => {
+				if (!playerStats[ranking.playerName]) {
+					playerStats[ranking.playerName] = {
+						playerName: ranking.playerName,
+						totalPoints: 0,
+						weeksPlayed: 0,
+						wins: 0,
+						podiumFinishes: 0,
+						averagePosition: 0,
+						weeklyResults: []
+					};
+				}
+
+				const player = playerStats[ranking.playerName];
+				player.weeksPlayed++;
+				player.weeklyResults.push({
+					week: week.weekNumber,
+					position: ranking.position,
+					points: ranking.points
+				});
+
+				if (ranking.position === 1) player.wins++;
+				if (ranking.position <= 3) player.podiumFinishes++;
+			});
+		});
+
+		Object.values(playerStats).forEach(player => {
+			player.weeklyResults.sort((a, b) => b.points - a.points);
+			player.totalPoints = player.weeklyResults.slice(0, 7).reduce((sum, w) => sum + w.points, 0);
+			player.averagePosition = player.weeklyResults.reduce((sum, w) => sum + w.position, 0) / player.weeksPlayed;
+			player.weeklyResults.sort((a, b) => b.week - a.week);
+		});
+
+		return Object.values(playerStats).sort((a, b) => {
+			if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+			return a.averagePosition - b.averagePosition;
+		});
+	}
+
+	getTotalPrizePool(): number {
+		const uniquePlayers = new Set<string>();
+		let totalParticipants = 0;
+
+		this.weekResults.forEach(week => {
+			week.players.forEach(player => {
+				uniquePlayers.add(player.name);
+			});
+			totalParticipants += week.players.length;
+		});
+
+		return uniquePlayers.size * 10 + totalParticipants * 2.5;
+	}
+
+	getWeeklyPrizesWon(playerName: string): number {
+		let totalWon = 0;
+
+		this.weekResults.forEach(week => {
+			const winner = week.finalRanking.find(r => r.position === 1);
+			if (winner && winner.playerName === playerName) {
+				const weeklyPool = week.players.length * 2.5;
+				totalWon += Math.round(weeklyPool * 0.5);
+			}
+		});
+
+		return totalWon;
+	}
+
+	getActiveTournaments(): {id: string, players: string[], phase: string, lastUpdated: Date}[] {
+		try {
+			const saved = localStorage.getItem(TOURNAMENTS_KEY);
+			if (!saved) return [];
+
+			const tournaments = JSON.parse(saved);
+			return Object.entries(tournaments).map(([id, data]: [string, any]) => ({
+				id,
+				players: data.players?.map((p: any) => p.name) || [],
+				phase: this.getPhaseDescription(data.currentPhase, data.tournamentType),
+				lastUpdated: new Date(data.lastUpdated || Date.now())
+			}));
+		} catch (error) {
+			console.error('Error loading active tournaments:', error);
+			return [];
+		}
+	}
+
+	private getPhaseDescription(phase: string, tournamentType: string): string {
+		switch (phase) {
+			case 'group':
+				if (tournamentType === 'round-robin') {
+					return 'Karsinnat';
+				}
+				if (tournamentType === 'groups-3') return 'Lohkopelit (3 lohkoa)';
+				return 'Lohkopelit';
+			case 'playoff': return 'Karsinta finaaliin';
+			case 'final': return 'Finaali';
+			default: return 'Tuntematon';
+		}
+	}
 }
