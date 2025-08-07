@@ -70,12 +70,13 @@ import {TournamentService} from '../../services/tournament.service';
 		}
 	`],
 	template: `
-		<div class="roulette-container min-h-screen flex items-center justify-center p-6 relative overflow-hidden" @fadeIn>
+		<div class="roulette-container min-h-screen flex items-center justify-center p-6 relative overflow-hidden"
+			 @fadeIn>
 			<div *ngFor="let confetti of confettiPieces"
-			     class="confetti"
-			     [style.left.px]="confetti.x"
-			     [style.top.px]="confetti.y"
-			     [style.background-color]="confetti.color"></div>
+				 class="confetti"
+				 [style.left.px]="confetti.x"
+				 [style.top.px]="confetti.y"
+				 [style.background-color]="confetti.color"></div>
 
 			<div class="max-w-6xl w-full text-center">
 				<div class="mb-8">
@@ -93,8 +94,8 @@ import {TournamentService} from '../../services/tournament.service';
 					<div class="flex justify-center">
 						<div class="grid grid-cols-1 gap-4 max-w-md">
 							<div *ngFor="let _ of displayPlayers; let i = index"
-							     class="player-card p-6 bg-white bg-opacity-10 rounded-lg border border-white border-opacity-20 flex items-center"
-							     [class.locked]="lockedPlayers.includes(i)">
+								 class="player-card p-6 bg-white bg-opacity-10 rounded-lg border border-white border-opacity-20 flex items-center"
+								 [class.locked]="lockedPlayers.includes(i)">
 								<div class="text-3xl mr-4">{{ i + 1 }}.</div>
 								<div class="text-2xl font-bold">{{ getDisplayName(i) }}</div>
 							</div>
@@ -103,24 +104,26 @@ import {TournamentService} from '../../services/tournament.service';
 				</div>
 
 				<!-- Group Layout (6+ players) -->
-				<div *ngIf="tournamentService.tournamentType === 'groups' || tournamentService.tournamentType === 'groups-3'" class="mb-8">
+				<div
+					*ngIf="tournamentService.tournamentType === 'groups' || tournamentService.tournamentType === 'groups-3'"
+					class="mb-8">
 					<div class="text-lg font-semibold mb-6 text-white opacity-90">
 						{{ tournamentService.tournamentType === 'groups-3' ? '3-lohkojen muodostus' : 'Lohkojen muodostus' }}
 					</div>
 
 					<div class="grid gap-8 max-w-6xl mx-auto"
-					     [class.grid-cols-1]="groups.length === 1"
-					     [class.md:grid-cols-2]="groups.length === 2"
-					     [class.md:grid-cols-3]="groups.length === 3">
+						 [class.grid-cols-1]="groups.length === 1"
+						 [class.md:grid-cols-2]="groups.length === 2"
+						 [class.md:grid-cols-3]="groups.length === 3">
 						<div *ngFor="let group of groups; let groupIndex = index"
-						     class="group-container p-6 bg-white bg-opacity-10 rounded-lg border border-white border-opacity-20">
+							 class="group-container p-6 bg-white bg-opacity-10 rounded-lg border border-white border-opacity-20">
 							<div class="text-2xl font-bold mb-4 text-yellow-300">
 								Lohko {{ groupIndex + 1 }}
 							</div>
 							<div class="space-y-3">
 								<div *ngFor="let _ of group; let i = index"
-								     class="player-card p-3 bg-white bg-opacity-20 rounded-md"
-								     [class.locked]="isGroupPlayerLocked(groupIndex, i)">
+									 class="player-card p-3 bg-white bg-opacity-20 rounded-md"
+									 [class.locked]="isGroupPlayerLocked(groupIndex, i)">
 									<div class="text-lg font-semibold">{{ getGroupDisplayName(groupIndex, i) }}</div>
 								</div>
 							</div>
@@ -130,9 +133,11 @@ import {TournamentService} from '../../services/tournament.service';
 
 				<div *ngIf="allLocked" class="mt-8">
 					<div class="text-lg mb-4 text-green-300 font-semibold">
-						{{ tournamentService.tournamentType === 'round-robin' ?
-						'Pelausjärjestys arvottu!' :
-						(tournamentService.tournamentType === 'groups-3' ? '3 lohkoa muodostettu!' : 'Lohkot muodostettu!') }}
+						{{
+							tournamentService.tournamentType === 'round-robin' ?
+								'Pelausjärjestys arvottu!' :
+								(tournamentService.tournamentType === 'groups-3' ? '3 lohkoa muodostettu!' : 'Lohkot muodostettu!')
+						}}
 					</div>
 					<button
 						(click)="startTournament()"
@@ -239,7 +244,7 @@ export class RouletteComponent implements OnInit, OnDestroy {
 			});
 		}, 150));
 
-		setTimeout(() => this.lockPlayersSequentially(), 2000);
+		setTimeout(() => this.lockPlayersSequentially(), 3000);
 	}
 
 	private startGroupAnimation(): void {
@@ -253,7 +258,7 @@ export class RouletteComponent implements OnInit, OnDestroy {
 			});
 		}, 150));
 
-		setTimeout(() => this.lockGroupsSequentially(), 2000);
+		setTimeout(() => this.lockGroupsSequentially(), 3000);
 	}
 
 	private lockPlayersSequentially(): void {
@@ -278,7 +283,7 @@ export class RouletteComponent implements OnInit, OnDestroy {
 					this.tournamentService.setupTournament();
 				}
 			}
-		}, 600);
+		}, Math.floor(Math.random() * 1001) + 1000);
 
 		this.intervals.push(lockInterval);
 	}
@@ -324,7 +329,7 @@ export class RouletteComponent implements OnInit, OnDestroy {
 					this.tournamentService.setupTournament();
 				}
 			}
-		}, 500);
+		}, Math.floor(Math.random() * 1001) + 1000);
 
 		this.intervals.push(lockInterval);
 	}
