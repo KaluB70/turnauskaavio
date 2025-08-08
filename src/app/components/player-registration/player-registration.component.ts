@@ -4,8 +4,6 @@ import {FormsModule} from '@angular/forms';
 import {Router} from '@angular/router';
 import {TournamentService, GameMode} from '../../services/tournament.service';
 
-const RECENT_PLAYERS_KEY = 'darts_recent_players';
-
 @Component({
 	selector: 'player-registration',
 	standalone: true,
@@ -183,33 +181,12 @@ export class PlayerRegistrationComponent implements OnInit {
 	}
 
 	private loadRecentPlayers(): void {
-		try {
-			const saved = localStorage.getItem(RECENT_PLAYERS_KEY);
-			if (saved) {
-				this.recentPlayers = JSON.parse(saved);
-			}
-		} catch (error) {
-			this.recentPlayers = [];
-		}
+		this.recentPlayers = this.tournamentService.getRecentPlayers();
 	}
 
 	private saveRecentPlayer(name: string): void {
-		if (!name.trim()) return;
-
-		this.recentPlayers = this.recentPlayers.filter(p =>
-			p.toLowerCase() !== name.toLowerCase()
-		);
-		this.recentPlayers.unshift(name.trim());
-
-		if (this.recentPlayers.length > 15) {
-			this.recentPlayers = this.recentPlayers.slice(0, 15);
-		}
-
-		try {
-			localStorage.setItem(RECENT_PLAYERS_KEY, JSON.stringify(this.recentPlayers));
-		} catch (error) {
-			console.error('Failed to save recent players');
-		}
+		this.tournamentService.addRecentPlayer(name);
+		this.loadRecentPlayers(); // Refresh the local list
 	}
 
 	getNextWeek(): number {

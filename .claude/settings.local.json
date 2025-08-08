@@ -10,7 +10,8 @@
       "Bash(ng build:*)",
       "Bash(mkdir:*)",
       "Bash(npx tsc:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

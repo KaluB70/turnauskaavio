@@ -1,27 +1,104 @@
-# Turnauskaavio
+# 🎯 Turnauskaavio - Finnish Darts Tournament Manager
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 17.3.5.
+A comprehensive Angular 17 application for managing Finnish darts weekly tournaments with multiple tournament formats, player tracking, and season standings.
 
-## Development server
+## 🚀 Features
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+- **Multiple Tournament Formats**: Automatically selects format based on player count
+  - 3-5 players: Round-robin → top 3 to final
+  - 6-8 players: 2 groups → group winners + playoff → 3-way final  
+  - 9+ players: 3 groups → group winners → 3-way final
 
-## Code scaffolding
+- **Season Management**: Track players across multiple weeks with ranking points system
+- **Google Drive Integration**: Import/export tournament data in JSON format
+- **Prize Pool Calculation**: Automatic calculation of weekly and season prizes
+- **Player Management**: Recent player suggestions with autocomplete
+- **Match Tracking**: Complete match history with leg differences
+- **Tiebreaker System**: 9-dart challenge for tied players
+- **Responsive Design**: Mobile-friendly interface with Tailwind CSS
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+## 🛠️ Development
 
-## Build
+### Prerequisites
+- Node.js (18+)
+- Angular CLI (17.3.5)
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+### Setup
+```bash
+npm install
+ng serve
+```
 
-## Running unit tests
+Navigate to `http://localhost:4200/`
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+### Build
+```bash
+ng build
+```
 
-## Running end-to-end tests
+Build artifacts are stored in the `dist/` directory.
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+### Testing
+```bash
+ng test
+```
 
-## Further help
+## 🏗️ Architecture
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+### Core Components
+- **AppComponent**: Main navigation and routing
+- **PlayerRegistrationComponent**: Tournament setup and player management
+- **TournamentBracketComponent**: Live tournament display and match tracking
+- **StandingsComponent**: Season statistics and prize calculations
+- **RouletteComponent**: Visual player/group randomization
+
+### Services
+- **TournamentService**: Core business logic and state management
+- **DriveService**: Google Drive API integration
+- **SoundService**: Audio feedback system
+
+### Data Flow
+1. Player registration → Tournament format determination
+2. Match generation with alternating order algorithm
+3. Live match tracking with automatic progression
+4. Tiebreaker resolution via 9-dart challenge
+5. Final rankings and prize distribution
+6. Season statistics aggregation
+
+## 📊 Tournament System
+
+### Scoring
+- **Match Points**: 3 for win, 0 for loss
+- **Season Points**: 5-3-1-0 for positions 1-4
+- **Best 7 weeks** count for season standings
+
+### Prize Distribution
+- **Weekly**: 50% to winner (€2.50 × player count)
+- **Season**: 50%/30%/20% split for top 3 (€10 per unique player + €2.50 per participation)
+
+## 🔧 Configuration
+
+### Google Drive Setup
+1. Enable Google Drive API in Google Cloud Console
+2. Create API key with Drive API access
+3. Configure in Settings → Google Drive Integration
+4. Share JSON data file publicly for read access
+
+### Local Storage
+- Tournament data: `darts_tournaments`
+- Season results: `darts_results` 
+- Recent players: `darts_recent_players`
+- Drive config: `drive_config`
+
+## 🚨 Recent Updates
+
+- ✅ Fixed tiebreaker infinite loop issues
+- ✅ Improved weeks played counting for all participants
+- ✅ Added Google Drive JSON integration
+- ✅ Enhanced season standings with individual medal counts
+- ✅ Added player lists to week details view
+- ✅ Cleaned up code quality and removed duplications
+
+## 📝 License
+
+This project is for managing Finnish darts tournaments and is built with Angular 17.

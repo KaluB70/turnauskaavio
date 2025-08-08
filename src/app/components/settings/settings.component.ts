@@ -158,33 +158,14 @@ export class SettingsComponent {
 	}
 
 	private loadSavedConfig(): void {
-		// Try new drive config first, fallback to old sheets config for migration
-		let saved = localStorage.getItem('drive_config');
-		let configKey = 'drive_config';
+		const config = this.tournamentService.loadDriveConfig();
+		if (config) {
+			this.fileId = config.fileId || '';
+			this.apiKey = config.apiKey || '';
+			this.isConfigured = !!this.apiKey;
 
-		if (!saved) {
-			saved = localStorage.getItem('sheets_config');
-			configKey = 'sheets_config';
-		}
-
-		if (saved) {
-			try {
-				const config = JSON.parse(saved);
-				this.fileId = config.fileId || config.spreadsheetId || ''; // backward compatibility
-				this.apiKey = config.apiKey || '';
-				this.isConfigured = !!this.apiKey;
-
-				if (this.isConfigured) {
-					this.tournamentService.configureGoogleDrive(this.apiKey, this.fileId);
-
-					// Migrate from old config if needed
-					if (configKey === 'sheets_config') {
-						const newConfig = { fileId: this.fileId, apiKey: this.apiKey };
-						localStorage.setItem('drive_config', JSON.stringify(newConfig));
-					}
-				}
-			} catch (error) {
-				console.error('Error loading drive config:', error);
+			if (this.isConfigured) {
+				this.tournamentService.configureGoogleDrive(this.apiKey, this.fileId);
 			}
 		}
 	}

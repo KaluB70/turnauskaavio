@@ -184,47 +184,44 @@ export class TournamentService {
 			.sort((a, b) => a.weekNumber - b.weekNumber);
 	}
 
-	/**
-	 * Generate consistent player IDs based on name and week
-	 * This ensures the same player gets the same ID across different weeks
-	 */
-	private getPlayerIdByName(name: string, weekNumber: number, fallbackId: number): number {
-		// Simple hash function to generate consistent IDs
-		let hash = 0;
-		for (let i = 0; i < name.length; i++) {
-			const char = name.charCodeAt(i);
-			hash = ((hash << 5) - hash) + char;
-			hash = hash & hash; // Convert to 32-bit integer
-		}
-		// Ensure positive ID
-		return Math.abs(hash) || (weekNumber * 1000 + fallbackId);
-	}
 
 	private mergeWeekResults(driveResults: WeekResult[], localResults: WeekResult[]): WeekResult[] {
-		const merged = [...localResults]; // Start with local data
+		const merged = [...localResults];
 		let newWeeksAdded = 0;
-		let conflictsResolved = 0;
 
 		driveResults.forEach(driveResult => {
-			// Check if this week already exists in local data
 			const existingIndex = merged.findIndex(r => r.weekNumber === driveResult.weekNumber);
-
 			if (existingIndex === -1) {
-				// Week doesn't exist locally, add from drive
 				merged.push(driveResult);
 				newWeeksAdded++;
-				console.log(`Added week ${driveResult.weekNumber} from Google Drive`);
-			} else {
-				// Week exists - prefer local data but you could add logic to prefer newer data based on date
-				conflictsResolved++;
-				console.log(`Week ${driveResult.weekNumber} exists in both sources, keeping local data`);
 			}
 		});
 
-		console.log(`Merge complete: ${newWeeksAdded} new weeks added, ${conflictsResolved} conflicts resolved (local data kept)`);
-
-		// Sort by week number
+		console.log(`Merge complete: ${newWeeksAdded} new weeks added`);
 		return merged.sort((a, b) => a.weekNumber - b.weekNumber);
+	}
+
+	/**
+	 * Load Google Drive config from localStorage with fallback to sheets config
+	 */
+	loadDriveConfig(): { apiKey: string; fileId?: string } | null {
+		let saved = localStorage.getItem('drive_config');
+		if (!saved) {
+			saved = localStorage.getItem('sheets_config');
+		}
+		
+		if (saved) {
+			try {
+				const config = JSON.parse(saved);
+				return {
+					apiKey: config.apiKey || '',
+					fileId: config.fileId || config.spreadsheetId || ''
+				};
+			} catch {
+				return null;
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -246,61 +243,82 @@ export class TournamentService {
 	}
 
 	/**
+	 * Get recent players from localStorage
+	 */
+	getRecentPlayers(): string[] {
+		const RECENT_PLAYERS_KEY = 'darts_recent_players';
+		try {
+			const saved = localStorage.getItem(RECENT_PLAYERS_KEY);
+			return saved ? JSON.parse(saved) : [];
+		} catch {
+			return [];
+		}
+	}
+
+	/**
+	 * Add a player to recent players list
+	 */
+	addRecentPlayer(name: string): void {
+		const RECENT_PLAYERS_KEY = 'darts_recent_players';
+		const MAX_RECENT_PLAYERS = 15;
+
+		if (!name?.trim()) return;
+
+		let recentPlayers = this.getRecentPlayers();
+		recentPlayers = recentPlayers.filter(p => p.toLowerCase() !== name.toLowerCase());
+		recentPlayers.unshift(name.trim());
+		recentPlayers = recentPlayers.slice(0, MAX_RECENT_PLAYERS);
+
+		try {
+			localStorage.setItem(RECENT_PLAYERS_KEY, JSON.stringify(recentPlayers));
+		} catch (error) {
+			console.error('Failed to save recent players:', error);
+		}
+	}
+
+	/**
 	 * Extract unique player names from week results and populate recent players
 	 */
 	populateRecentPlayersFromData(): void {
 		const RECENT_PLAYERS_KEY = 'darts_recent_players';
 		const MAX_RECENT_PLAYERS = 15;
 
-		// Get all unique player names from week results
 		const allPlayers = new Set<string>();
 
 		this.weekResults.forEach(week => {
 			week.players.forEach(player => {
-				if (player.name && player.name.trim()) {
+				if (player.name?.trim()) {
 					allPlayers.add(player.name.trim());
 				}
 			});
-
-			// Also get names from finalRanking in case players array is incomplete
+			
 			week.finalRanking.forEach(ranking => {
-				if (ranking.playerName && ranking.playerName.trim()) {
+				if (ranking.playerName?.trim()) {
 					allPlayers.add(ranking.playerName.trim());
 				}
 			});
 		});
 
-		// Convert to array and sort alphabetically for consistency
 		const uniquePlayers = Array.from(allPlayers).sort();
 
-		// Get existing recent players
 		let recentPlayers: string[] = [];
 		try {
 			const saved = localStorage.getItem(RECENT_PLAYERS_KEY);
-			if (saved) {
-				recentPlayers = JSON.parse(saved);
-			}
-		} catch (error) {
+			recentPlayers = saved ? JSON.parse(saved) : [];
+		} catch {
 			recentPlayers = [];
 		}
 
-		// Merge with imported players, keeping existing order but adding new players
 		uniquePlayers.forEach(player => {
-			// Remove if already exists (case insensitive)
-			recentPlayers = recentPlayers.filter(p =>
-				p.toLowerCase() !== player.toLowerCase()
-			);
-			// Add to front
+			recentPlayers = recentPlayers.filter(p => p.toLowerCase() !== player.toLowerCase());
 			recentPlayers.unshift(player);
 		});
 
-		// Limit to max size
 		recentPlayers = recentPlayers.slice(0, MAX_RECENT_PLAYERS);
 
-		// Save back to localStorage
 		try {
 			localStorage.setItem(RECENT_PLAYERS_KEY, JSON.stringify(recentPlayers));
-			console.log(`Updated recent players with ${uniquePlayers.length} players from imported data`);
+			console.log(`Updated recent players with ${uniquePlayers.length} players`);
 		} catch (error) {
 			console.error('Failed to save recent players:', error);
 		}
@@ -1115,24 +1133,6 @@ export class TournamentService {
 		}
 	}
 
-	private hasGroupTie(groupNum: number): boolean {
-		// Legacy method - kept for compatibility
-		const groupStandings = this.getGroupStandings(groupNum);
-		const tiedGroups = this.findUnresolvableTies(groupStandings);
-
-		if (tiedGroups.length > 0) {
-			// Set up tiebreaker for this group
-			this.requiresTiebreaker = true;
-			this.tiebreakerPlayers = tiedGroups.map(s =>
-				this.players.find(p => p.id === s.playerId)!
-			);
-			this.initializeTiebreaker();
-			this.saveTournamentState();
-			return true;
-		}
-
-		return false;
-	}
 
 	private findUnresolvableTies(standings: Standing[]): Standing[] {
 		// Group players by points, leg difference, and tiebreaker score
@@ -1363,15 +1363,7 @@ export class TournamentService {
 	}
 
 	getCurrentPhaseDescription(): string {
-		switch (this.currentPhase) {
-			case 'group':
-				if (this.tournamentType === 'round-robin') return 'Karsinnat';
-				if (this.tournamentType === 'groups-3') return 'Lohkopelit (3 lohkoa)';
-				return 'Lohkopelit';
-			case 'playoff': return 'Karsinta finaaliin';
-			case 'final': return 'Finaali';
-			default: return '';
-		}
+		return this.getPhaseDescription(this.currentPhase, this.tournamentType);
 	}
 
 	is3WayFinal(): boolean {

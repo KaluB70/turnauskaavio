@@ -97,23 +97,12 @@ export class HomeComponent implements OnInit {
 	}
 
 	private async loadGoogleDriveData(): Promise<void> {
-		// Check if Google Drive is configured and load data silently
-		let saved = localStorage.getItem('drive_config');
-		if (!saved) {
-			// Fallback to old sheets config for migration
-			saved = localStorage.getItem('sheets_config');
-		}
-		
-		if (saved) {
+		const config = this.tournamentService.loadDriveConfig();
+		if (config?.apiKey) {
 			try {
-				const config = JSON.parse(saved);
-				if (config.apiKey) {
-					// Configure and load data silently in the background
-					this.tournamentService.configureGoogleDrive(config.apiKey, config.fileId || config.spreadsheetId);
-					await this.tournamentService.loadSeasonDataFromDrive();
-				}
+				this.tournamentService.configureGoogleDrive(config.apiKey, config.fileId);
+				await this.tournamentService.loadSeasonDataFromDrive();
 			} catch (error) {
-				// Fail silently - user can manually load in settings if needed
 				console.log('Background Google Drive load failed:', error);
 			}
 		}
