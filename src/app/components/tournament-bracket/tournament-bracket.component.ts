@@ -167,15 +167,87 @@ import {TournamentService, Match, Standing} from '../../services/tournament.serv
 				<p class="text-sm text-gray-600">Lohkojen kakkospelaajat pelaavat kolmannesta finaalipaikasta (BO1)</p>
 			</div>
 
-			<div *ngIf="tournamentService.currentPhase !== 'final'" class="bg-white p-6 rounded-lg shadow">
+			<!-- Final phase standings -->
+			<div *ngIf="tournamentService.currentPhase === 'final'" class="bg-white p-6 rounded-lg shadow">
+				<h3 class="text-lg font-semibold mb-4">📊 Illan tulokset</h3>
+				
+				<div *ngIf="tournamentService.tournamentType === 'round-robin'" class="overflow-x-auto">
+					<table class="standings-table w-full">
+						<thead>
+						<tr class="bg-gray-50">
+							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sija</th>
+							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pelaaja</th>
+							<th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Voitot</th>
+							<th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Tappiot</th>
+							<th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Legiero</th>
+							<th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Pisteet</th>
+						</tr>
+						</thead>
+						<tbody class="bg-white divide-y divide-gray-200">
+						<tr *ngFor="let standing of getSortedStandings(); let i = index"
+						    class="standings-row"
+						    [class.position-1]="i === 0"
+						    [class.position-2]="i === 1"
+						    [class.position-3]="i === 2">
+							<td class="px-4 py-3 whitespace-nowrap text-sm font-medium">{{ i + 1 }}.</td>
+							<td class="px-4 py-3 whitespace-nowrap text-sm font-medium">{{ standing.playerName }}</td>
+							<td class="px-4 py-3 text-center text-sm">{{ standing.wins }}</td>
+							<td class="px-4 py-3 text-center text-sm">{{ standing.losses }}</td>
+							<td class="px-4 py-3 text-center text-sm">{{ standing.legDifference >= 0 ? '+' : '' }}{{ standing.legDifference }}</td>
+							<td class="px-4 py-3 text-center text-sm font-semibold">{{ standing.points }}</td>
+						</tr>
+						</tbody>
+					</table>
+				</div>
+
+				<div *ngIf="tournamentService.tournamentType === 'groups' || tournamentService.tournamentType === 'groups-3'"
+				     class="grid gap-4"
+				     [class.grid-cols-1]="[1, 3].includes(getGroupCount())"
+				     [class.lg:grid-cols-2]="getGroupCount() === 2"
+				     [class.lg:grid-cols-3]="getGroupCount() === 3">
+					<div *ngFor="let group of getGroupNumbers()" class="group-container p-4 rounded-lg">
+						<h4 class="font-medium mb-3 text-blue-600">Lohko {{ group }} lopputulokset</h4>
+						<div class="overflow-x-auto">
+							<table class="standings-table w-full text-sm">
+								<thead>
+								<tr class="bg-gray-50">
+									<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Sija</th>
+									<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Pelaaja</th>
+									<th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">V-T</th>
+									<th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Legiero</th>
+									<th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Pisteet</th>
+								</tr>
+								</thead>
+								<tbody class="bg-white divide-y divide-gray-200">
+								<tr *ngFor="let standing of getGroupStandings(group); let i = index"
+								    class="standings-row"
+								    [class.position-1]="i === 0"
+								    [class.position-2]="i === 1">
+									<td class="px-3 py-2 whitespace-nowrap text-xs font-medium">{{ i + 1 }}.</td>
+									<td class="px-3 py-2 whitespace-nowrap text-xs font-medium">{{ standing.playerName }}</td>
+									<td class="px-3 py-2 text-center text-xs">{{ standing.wins }}-{{ standing.losses }}</td>
+									<td class="px-3 py-2 text-center text-xs">{{ standing.legDifference >= 0 ? '+' : '' }}{{ standing.legDifference }}</td>
+									<td class="px-3 py-2 text-center text-xs font-semibold">{{ standing.points }}</td>
+								</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="bg-white p-6 rounded-lg shadow">
 				<div class="flex justify-between items-center mb-4">
 					<h3 class="text-lg font-semibold">Ottelut</h3>
-					<div class="text-xs text-gray-500 bg-blue-50 px-3 py-1 rounded-full">
+					<div *ngIf="tournamentService.currentPhase !== 'final'" class="text-xs text-gray-500 bg-blue-50 px-3 py-1 rounded-full">
 						💡 Klikkaa ottelua muokataksesi tai vaihtaaksesi nykyistä ottelua
+					</div>
+					<div *ngIf="tournamentService.currentPhase === 'final'" class="text-xs text-gray-500 bg-gray-50 px-3 py-1 rounded-full">
+						📜 Turnauksen ottelut
 					</div>
 				</div>
 
-				<div *ngIf="tournamentService.currentPhase === 'group' && (tournamentService.tournamentType === 'groups' || tournamentService.tournamentType === 'groups-3')">
+				<div *ngIf="(tournamentService.currentPhase === 'group' || tournamentService.currentPhase === 'final') && (tournamentService.tournamentType === 'groups' || tournamentService.tournamentType === 'groups-3')">
 					<div *ngFor="let group of getGroupNumbers()" class="mb-6">
 						<h4 class="font-medium mb-3 text-blue-600">Lohko {{ group }} ottelut</h4>
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -183,8 +255,9 @@ import {TournamentService, Match, Standing} from '../../services/tournament.serv
 							     class="match-card p-4 bg-gray-50 rounded-lg border"
 							     [class.completed-match]="match.isComplete"
 							     [class.current-match]="isCurrentMatch(match)"
-							     [class.selectable-match]="canSelectMatch(match)"
-							     (click)="selectMatch(match)">
+							     [class.selectable-match]="canSelectMatch(match) && tournamentService.currentPhase !== 'final'"
+							     (click)="selectMatch(match)"
+							     [style.pointer-events]="tournamentService.currentPhase === 'final' ? 'none' : 'auto'">
 								<div class="flex justify-between items-center">
 									<div class="text-sm font-medium">{{ tournamentService.getPlayerName(match.player1Id) }}</div>
 									<div class="text-xs text-gray-500">vs</div>
@@ -196,20 +269,21 @@ import {TournamentService, Match, Standing} from '../../services/tournament.serv
 									<span [class.winner-highlight]="match.winner === match.player2Id">{{ match.player2Legs }}</span>
 								</div>
 								<div *ngIf="isCurrentMatch(match)" class="mt-2 text-xs text-amber-600 font-medium">⚡ Käynnissä</div>
-								<div *ngIf="canEditMatch(match)" class="mt-2 text-xs text-blue-600 font-medium">✏️ Muokattava</div>
+								<div *ngIf="canEditMatch(match) && tournamentService.currentPhase !== 'final'" class="mt-2 text-xs text-blue-600 font-medium">✏️ Muokattava</div>
 							</div>
 						</div>
 					</div>
 				</div>
 
-				<div *ngIf="tournamentService.tournamentType === 'round-robin' || (tournamentService.currentPhase !== 'group' && !tournamentService.is3WayFinal())">
+				<div *ngIf="tournamentService.tournamentType === 'round-robin' || (tournamentService.currentPhase !== 'group' && !tournamentService.is3WayFinal()) || tournamentService.currentPhase === 'final'">
 					<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
 						<div *ngFor="let match of getRelevantMatches()"
 						     class="match-card p-4 bg-gray-50 rounded-lg border"
 						     [class.completed-match]="match.isComplete"
 						     [class.current-match]="isCurrentMatch(match)"
-						     [class.selectable-match]="canSelectMatch(match)"
-						     (click)="selectMatch(match)">
+						     [class.selectable-match]="canSelectMatch(match) && tournamentService.currentPhase !== 'final'"
+						     (click)="selectMatch(match)"
+						     [style.pointer-events]="tournamentService.currentPhase === 'final' ? 'none' : 'auto'">
 
 							<div class="flex justify-between items-center mb-2">
 								<span class="text-xs text-gray-500">{{ getRoundText(match) }}</span>
@@ -229,7 +303,7 @@ import {TournamentService, Match, Standing} from '../../services/tournament.serv
 							</div>
 
 							<div *ngIf="isCurrentMatch(match)" class="mt-2 text-xs text-amber-600 font-medium">⚡ Käynnissä</div>
-							<div *ngIf="canEditMatch(match)" class="mt-2 text-xs text-blue-600 font-medium">✏️ Muokattava</div>
+							<div *ngIf="canEditMatch(match) && tournamentService.currentPhase !== 'final'" class="mt-2 text-xs text-blue-600 font-medium">✏️ Muokattava</div>
 						</div>
 					</div>
 				</div>
@@ -312,8 +386,9 @@ export class TournamentBracketComponent {
 				.filter(m => m.round === 'playoff')
 				.sort((a, b) => a.id - b.id);
 		} else {
+			// In final phase, show all completed matches (past ottelut), not the current final
 			return this.tournamentService.matches
-				.filter(m => m.round === 'final')
+				.filter(m => m.isComplete && m.round !== 'final')
 				.sort((a, b) => a.id - b.id);
 		}
 	}

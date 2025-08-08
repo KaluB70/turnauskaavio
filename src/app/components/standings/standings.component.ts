@@ -14,7 +14,7 @@ import {SeasonStanding, TournamentService} from '../../services/tournament.servi
 		}
 
 		.standings-container {
-			overflow: hidden;
+			-webkit-overflow-scrolling: touch;
 		}
 
 		.standings-row {
@@ -23,7 +23,8 @@ import {SeasonStanding, TournamentService} from '../../services/tournament.servi
 
 		.standings-row:hover {
 			background-color: #f9fafb;
-			transform: translateX(2px);
+			box-shadow: 4px 0 0 0 #3b82f6;
+			transform: translateZ(0);
 		}
 
 		.position-1 {
@@ -86,6 +87,24 @@ import {SeasonStanding, TournamentService} from '../../services/tournament.servi
 			background-color: #e5e7eb;
 			color: #374151;
 		}
+
+		@media (max-width: 768px) {
+			.standings-container {
+				border-radius: 0.5rem;
+				border: 1px solid #e5e7eb;
+			}
+			
+			.standings-table th,
+			.standings-table td {
+				padding: 8px 6px;
+				font-size: 0.8rem;
+			}
+			
+			.points-badge {
+				padding: 2px 6px;
+				font-size: 0.75rem;
+			}
+		}
 	`],
 	template: `
 		<div class="container mx-auto px-4 py-8">
@@ -145,7 +164,7 @@ import {SeasonStanding, TournamentService} from '../../services/tournament.servi
 					</div>
 
 					<div *ngIf="seasonStandings.length > 0" class="standings-container overflow-x-auto">
-						<table class="standings-table w-full">
+						<table class="standings-table w-full min-w-[1000px]">
 							<thead>
 							<tr class="bg-gray-50">
 								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sija</th>
@@ -158,8 +177,6 @@ import {SeasonStanding, TournamentService} from '../../services/tournament.servi
 								<th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Voitettu
 								</th>
 								<th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Viikkoja
-								</th>
-								<th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Voitot
 								</th>
 								<th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Podium
 								</th>
@@ -181,7 +198,7 @@ import {SeasonStanding, TournamentService} from '../../services/tournament.servi
 								<td class="px-4 py-3 whitespace-nowrap">
 									<div class="flex items-center">
 										<span class="text-lg font-bold">{{ i + 1 }}.</span>
-										<span *ngIf="i === 0" class="ml-2 text-yellow-500">👑</span>
+										<span *ngIf="i === 0" class="ml-2 text-yellow-500">🥇</span>
 										<span *ngIf="i === 1" class="ml-2 text-gray-400">🥈</span>
 										<span *ngIf="i === 2" class="ml-2 text-orange-500">🥉</span>
 									</div>
@@ -213,17 +230,22 @@ import {SeasonStanding, TournamentService} from '../../services/tournament.servi
 
 								<td class="px-4 py-3 text-center text-sm">{{ player.weeksPlayed }}</td>
 
-								<td class="px-4 py-3 text-center">
-									<div class="flex items-center justify-center">
-										<span class="font-semibold">{{ player.wins }}</span>
-										<span *ngIf="player.wins > 0" class="ml-1 text-yellow-500">🏆</span>
-									</div>
-								</td>
 
 								<td class="px-4 py-3 text-center">
-									<div class="flex items-center justify-center">
-										<span class="font-semibold">{{ player.podiumFinishes }}</span>
-										<span *ngIf="player.podiumFinishes > 0" class="ml-1 text-orange-500">🏅</span>
+									<div class="flex items-center justify-center space-x-1">
+										<span *ngIf="player.goldMedals > 0" class="flex items-center">
+											<span class="text-yellow-500">🥇</span>
+											<span class="text-xs font-semibold ml-0.5">{{ player.goldMedals }}</span>
+										</span>
+										<span *ngIf="player.silverMedals > 0" class="flex items-center">
+											<span class="text-gray-400">🥈</span>
+											<span class="text-xs font-semibold ml-0.5">{{ player.silverMedals }}</span>
+										</span>
+										<span *ngIf="player.bronzeMedals > 0" class="flex items-center">
+											<span class="text-amber-600">🥉</span>
+											<span class="text-xs font-semibold ml-0.5">{{ player.bronzeMedals }}</span>
+										</span>
+										<span *ngIf="player.podiumFinishes === 0" class="text-gray-400">-</span>
 									</div>
 								</td>
 
@@ -256,10 +278,15 @@ import {SeasonStanding, TournamentService} from '../../services/tournament.servi
 					<h3 class="text-lg font-semibold mb-4">📅 Viimeisimmät viikkokisat</h3>
 
 					<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-						<div *ngFor="let week of getRecentWeeks()" class="bg-white p-4 rounded-lg shadow-sm">
+						<div *ngFor="let week of getRecentWeeks()" 
+						     class="bg-white p-4 rounded-lg shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200"
+						     (click)="toggleWeekDetails(week.weekNumber)">
 							<div class="flex justify-between items-center mb-2">
 								<span class="font-semibold text-blue-600">Viikko {{ week.weekNumber }}</span>
-								<span class="text-xs text-gray-500">{{ week.date | date:'dd.MM' }}</span>
+								<div class="flex items-center">
+									<span class="text-xs text-gray-500 mr-2">{{ week.date | date:'dd.MM' }}</span>
+									<span class="text-sm" [innerHTML]="expandedWeek === week.weekNumber ? '▼' : '▶'"></span>
+								</div>
 							</div>
 
 							<div class="space-y-1">
@@ -268,8 +295,57 @@ import {SeasonStanding, TournamentService} from '../../services/tournament.servi
 									<div class="flex items-center">
 										<span class="w-4 text-center font-medium">{{ pos + 1 }}.</span>
 										<span class="ml-2">{{ ranking.playerName }}</span>
+										<span *ngIf="pos === 0" class="ml-2 text-yellow-600 font-medium text-xs">💰 {{ week.players.length * 2.5 }}€</span>
 									</div>
 									<span class="font-medium text-green-600">+{{ ranking.points }}p</span>
+								</div>
+							</div>
+							
+							<!-- Week details - shown when expanded -->
+							<div *ngIf="expandedWeek === week.weekNumber" 
+							     class="mt-3 pt-3 border-t border-gray-200">
+								
+								<!-- Players list -->
+								<h4 class="font-semibold text-sm mb-2">Pelaajat ({{ week.players.length }}):</h4>
+								<div class="flex flex-wrap gap-1 mb-3">
+									<span *ngFor="let player of week.players" 
+									      class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+										{{ player.name }}
+									</span>
+								</div>
+								
+								<!-- Match details -->
+								<div *ngIf="week.matches && week.matches.length > 0">
+									<h4 class="font-semibold text-sm mb-2">Ottelut:</h4>
+									<div class="space-y-1 mb-3">
+										<div *ngFor="let match of week.matches" class="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+											<div class="flex justify-between items-center">
+												<span>{{ match.player1Name }} vs {{ match.player2Name }}</span>
+												<span class="font-medium">{{ match.player1Legs }}-{{ match.player2Legs }}</span>
+											</div>
+											<div class="flex justify-between items-center mt-1">
+												<span class="text-green-600">🏆 {{ match.winnerName }}</span>
+												<span class="text-gray-500">{{ match.round }}{{ match.group ? ' (Lohko ' + match.group + ')' : '' }}</span>
+											</div>
+										</div>
+									</div>
+									
+									<h4 class="font-semibold text-sm mb-2">Pelaajien legierot:</h4>
+									<div class="grid grid-cols-2 gap-2">
+										<div *ngFor="let ranking of week.finalRanking" class="text-xs bg-blue-50 p-2 rounded">
+											<div class="flex justify-between items-center">
+												<span class="font-medium">{{ ranking.playerName }}</span>
+												<span class="font-mono" [class.text-green-600]="getWeeklyLegDifferenceNumber(week, ranking.playerName) > 0"
+												      [class.text-red-600]="getWeeklyLegDifferenceNumber(week, ranking.playerName) < 0">
+													{{ getWeeklyLegDifference(week, ranking.playerName) }}
+												</span>
+											</div>
+										</div>
+									</div>
+								</div>
+								
+								<div *ngIf="!week.matches || week.matches.length === 0" class="text-xs text-gray-500">
+									Ottelutietoja ei ole saatavilla tälle viikolle
 								</div>
 							</div>
 						</div>
@@ -281,6 +357,7 @@ import {SeasonStanding, TournamentService} from '../../services/tournament.servi
 })
 export class StandingsComponent implements OnInit {
 	seasonStandings: SeasonStanding[] = [];
+	expandedWeek: number | null = null;
 
 	constructor(
 		private tournamentService: TournamentService,
@@ -356,6 +433,33 @@ export class StandingsComponent implements OnInit {
 		return this.tournamentService.weekResults
 			.sort((a, b) => b.weekNumber - a.weekNumber)
 			.slice(0, 6);
+	}
+
+	getWeeklyLegDifference(week: any, playerName: string): string {
+		const difference = this.getWeeklyLegDifferenceNumber(week, playerName);
+		return difference >= 0 ? `+${difference}` : `${difference}`;
+	}
+
+	getWeeklyLegDifferenceNumber(week: any, playerName: string): number {
+		if (!week.matches || week.matches.length === 0) {
+			return 0;
+		}
+
+		let legDifference = 0;
+		
+		week.matches.forEach((match: any) => {
+			if (match.player1Name === playerName) {
+				legDifference += (match.player1Legs - match.player2Legs);
+			} else if (match.player2Name === playerName) {
+				legDifference += (match.player2Legs - match.player1Legs);
+			}
+		});
+
+		return legDifference;
+	}
+
+	toggleWeekDetails(weekNumber: number): void {
+		this.expandedWeek = this.expandedWeek === weekNumber ? null : weekNumber;
 	}
 
 	goHome(): void {

@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import {SheetsService} from './sheets.service';
+import {DriveService} from './drive.service';
 import {firstValueFrom} from 'rxjs';
 
 export interface Player {
@@ -33,12 +33,24 @@ export interface Standing {
 	legDifference: number;
 	points: number;
 	group: number;
+	tiebreakerScore?: number; // Added to resolve tiebreaker results
+}
+
+export interface MatchResult {
+	player1Name: string;
+	player2Name: string;
+	player1Legs: number;
+	player2Legs: number;
+	winnerName: string;
+	round: 'group' | 'playoff' | 'final';
+	group?: number;
 }
 
 export interface WeekResult {
 	weekNumber: number;
 	players: Player[];
 	finalRanking: { playerId: number; playerName: string; position: number; points: number }[];
+	matches: MatchResult[];
 	date: Date;
 	gameMode: string;
 }
@@ -49,6 +61,9 @@ export interface SeasonStanding {
 	weeksPlayed: number;
 	wins: number;
 	podiumFinishes: number;
+	goldMedals: number;
+	silverMedals: number;
+	bronzeMedals: number;
 	averagePosition: number;
 	weeklyResults: { week: number; position: number; points: number }[];
 }
@@ -99,7 +114,7 @@ export class TournamentService {
 
 	weekResults: WeekResult[] = [];
 
-	constructor(private sheetsService: SheetsService) {
+	constructor(private driveService: DriveService) {
 		this.loadWeekResults();
 	}
 
@@ -110,7 +125,8 @@ export class TournamentService {
 				const data = JSON.parse(saved);
 				this.weekResults = data.map((item: any) => ({
 					...item,
-					date: new Date(item.date)
+					date: new Date(item.date),
+					matches: item.matches || [] // Add backwards compatibility for existing data
 				}));
 			}
 		} catch (error) {
@@ -118,111 +134,54 @@ export class TournamentService {
 		}
 	}
 
+
 	/**
-	 * Load season data from Google Sheets (read-only)
+	 * Load season data from Google Drive JSON file (read-only)
 	 * This will merge with localStorage data, preferring localStorage for newer data
 	 */
-	async loadSeasonDataFromSheets(): Promise<void> {
+	async loadSeasonDataFromDrive(): Promise<void> {
 		try {
-			const sheetsData = await firstValueFrom(this.sheetsService.fetchSheetData('WeekResults'));
+			const driveData = await firstValueFrom(this.driveService.fetchFileContent());
 
-			if (sheetsData && sheetsData.length > 0) {
-				// Convert sheets data to WeekResult format
-				const sheetsWeekResults = this.convertSheetsToWeekResults(sheetsData);
+			if (driveData && driveData.weekResults && driveData.weekResults.length > 0) {
+				// Convert drive data to WeekResult format
+				const driveWeekResults = this.convertDriveToWeekResults(driveData.weekResults);
 
 				// Merge with existing localStorage data
 				// localStorage takes priority for same week numbers
-				// Update in-memory data
-				this.weekResults = this.mergeWeekResults(sheetsWeekResults, this.weekResults);
+				this.weekResults = this.mergeWeekResults(driveWeekResults, this.weekResults);
 
 				// Persist the merged data back to localStorage
 				this.saveWeekResults();
 
-				console.log(`Loaded ${sheetsWeekResults.length} week results from Google Sheets and persisted to localStorage`);
+				// Populate recent players from the loaded data
+				this.populateRecentPlayersFromData();
+
+				console.log(`Loaded ${driveWeekResults.length} week results from Google Drive and persisted to localStorage`);
 			}
 		} catch (error) {
-			console.warn('Failed to load data from Google Sheets:', error);
+			console.warn('Failed to load data from Google Drive:', error);
 			// Continue with localStorage data only
 		}
 	}
 
-	private convertSheetsToWeekResults(sheetsData: any[]): WeekResult[] {
-		// Group the normalized CSV data by week number
-		// Expected columns: Viikko, Pvm, Pelaajia, Pelimuoto, Sija, Pelaaja, Pisteet
-
-		const weekGroups: { [weekNumber: number]: any[] } = {};
-
-		// Group rows by week number
-		sheetsData.forEach(row => {
-			const weekNumber = Number(row.Viikko) || Number(row.weekNumber) || 0;
-			if (weekNumber > 0) {
-				if (!weekGroups[weekNumber]) {
-					weekGroups[weekNumber] = [];
-				}
-				weekGroups[weekNumber].push(row);
-			}
-		});
-
-		// Convert each week group to WeekResult
-		return Object.entries(weekGroups).map(([weekNum, rows]) => {
-			const weekNumber = Number(weekNum);
-			const firstRow = rows[0];
-
-			// Parse date from Finnish format (d.m.yyyy) to proper date
-			let date = new Date();
-			const dateStr = (firstRow.Pvm as string) || firstRow.date || '';
-			if (dateStr) {
-				const [day, month, year] = dateStr.split('.');
-				if (day && month && year) {
-					date = new Date(Number(year), Number(month) - 1, Number(day));
-				}
-			}
-
-			// Extract unique players for this week
-			const playerNames = [...new Set(rows.map(row => row.Pelaaja || row.playerName || '').filter(name => name))];
-			const players = playerNames.map((name, index) => ({
-				id: this.getPlayerIdByName(name, weekNumber, index + 1),
-				name: name
-			}));
-
-			// Build final ranking from the position data
-			const finalRanking = rows
-				.filter(row => (row.Pelaaja || row.playerName) && (row.Sija || row.position))
-				.map(row => {
-					const playerName = row.Pelaaja || row.playerName || '';
-					const position = Number(row.Sija || row.position) || 0;
-					const points = Number(row.Pisteet || row.points) || 0;
-					const playerId = this.getPlayerIdByName(playerName, weekNumber, position);
-
-					return {
-						playerId,
-						playerName,
-						position,
-						points
-					};
-				})
-				.filter(ranking => ranking.playerName && ranking.position > 0)
-				.sort((a, b) => a.position - b.position);
-
-			// Remove duplicates (keep first occurrence of each position)
-			const uniqueRankings: typeof finalRanking = [];
-			const seenPositions = new Set<number>();
-
-			finalRanking.forEach(ranking => {
-				if (!seenPositions.has(ranking.position)) {
-					seenPositions.add(ranking.position);
-					uniqueRankings.push(ranking);
-				}
-			});
-
-			return {
-				weekNumber,
-				players,
-				finalRanking: uniqueRankings,
-				date,
-				gameMode: (firstRow.Pelimuoto || firstRow.gameMode || '501') as GameMode
-			};
-		}).sort((a, b) => a.weekNumber - b.weekNumber);
+	private convertDriveToWeekResults(driveWeekResults: any[]): WeekResult[] {
+		// Drive data is already in WeekResult format (JSON), just need to normalize dates and validate
+		return driveWeekResults
+			.filter(week => week && week.weekNumber && week.players && week.finalRanking)
+			.map(week => ({
+				...week,
+				// Ensure date is properly converted from string if needed
+				date: typeof week.date === 'string' ? new Date(week.date) : week.date || new Date(),
+				// Ensure matches array exists
+				matches: week.matches || [],
+				// Validate game mode
+				gameMode: week.gameMode || '501',
+				// Ensure all required properties exist
+				players: week.players || [],
+				finalRanking: week.finalRanking || []
+			}))
+			.sort((a, b) => a.weekNumber - b.weekNumber);
 	}
 
 	/**
@@ -241,24 +200,24 @@ export class TournamentService {
 		return Math.abs(hash) || (weekNumber * 1000 + fallbackId);
 	}
 
-	private mergeWeekResults(sheetsResults: WeekResult[], localResults: WeekResult[]): WeekResult[] {
+	private mergeWeekResults(driveResults: WeekResult[], localResults: WeekResult[]): WeekResult[] {
 		const merged = [...localResults]; // Start with local data
 		let newWeeksAdded = 0;
 		let conflictsResolved = 0;
 
-		sheetsResults.forEach(sheetsResult => {
+		driveResults.forEach(driveResult => {
 			// Check if this week already exists in local data
-			const existingIndex = merged.findIndex(r => r.weekNumber === sheetsResult.weekNumber);
+			const existingIndex = merged.findIndex(r => r.weekNumber === driveResult.weekNumber);
 
 			if (existingIndex === -1) {
-				// Week doesn't exist locally, add from sheets
-				merged.push(sheetsResult);
+				// Week doesn't exist locally, add from drive
+				merged.push(driveResult);
 				newWeeksAdded++;
-				console.log(`Added week ${sheetsResult.weekNumber} from Google Sheets`);
+				console.log(`Added week ${driveResult.weekNumber} from Google Drive`);
 			} else {
 				// Week exists - prefer local data but you could add logic to prefer newer data based on date
 				conflictsResolved++;
-				console.log(`Week ${sheetsResult.weekNumber} exists in both sources, keeping local data`);
+				console.log(`Week ${driveResult.weekNumber} exists in both sources, keeping local data`);
 			}
 		});
 
@@ -269,12 +228,12 @@ export class TournamentService {
 	}
 
 	/**
-	 * Configure Google Sheets integration
+	 * Configure Google Drive integration
 	 */
-	configureGoogleSheets(spreadsheetId: string, apiKey?: string): void {
-		this.sheetsService.setConfig({
-			spreadsheetId,
-			apiKey
+	configureGoogleDrive(apiKey: string, fileId?: string): void {
+		this.driveService.setConfig({
+			apiKey,
+			fileId
 		});
 	}
 
@@ -283,6 +242,67 @@ export class TournamentService {
 			localStorage.setItem(RESULTS_KEY, JSON.stringify(this.weekResults));
 		} catch (error) {
 			console.error('Error saving data:', error);
+		}
+	}
+
+	/**
+	 * Extract unique player names from week results and populate recent players
+	 */
+	populateRecentPlayersFromData(): void {
+		const RECENT_PLAYERS_KEY = 'darts_recent_players';
+		const MAX_RECENT_PLAYERS = 15;
+
+		// Get all unique player names from week results
+		const allPlayers = new Set<string>();
+
+		this.weekResults.forEach(week => {
+			week.players.forEach(player => {
+				if (player.name && player.name.trim()) {
+					allPlayers.add(player.name.trim());
+				}
+			});
+
+			// Also get names from finalRanking in case players array is incomplete
+			week.finalRanking.forEach(ranking => {
+				if (ranking.playerName && ranking.playerName.trim()) {
+					allPlayers.add(ranking.playerName.trim());
+				}
+			});
+		});
+
+		// Convert to array and sort alphabetically for consistency
+		const uniquePlayers = Array.from(allPlayers).sort();
+
+		// Get existing recent players
+		let recentPlayers: string[] = [];
+		try {
+			const saved = localStorage.getItem(RECENT_PLAYERS_KEY);
+			if (saved) {
+				recentPlayers = JSON.parse(saved);
+			}
+		} catch (error) {
+			recentPlayers = [];
+		}
+
+		// Merge with imported players, keeping existing order but adding new players
+		uniquePlayers.forEach(player => {
+			// Remove if already exists (case insensitive)
+			recentPlayers = recentPlayers.filter(p =>
+				p.toLowerCase() !== player.toLowerCase()
+			);
+			// Add to front
+			recentPlayers.unshift(player);
+		});
+
+		// Limit to max size
+		recentPlayers = recentPlayers.slice(0, MAX_RECENT_PLAYERS);
+
+		// Save back to localStorage
+		try {
+			localStorage.setItem(RECENT_PLAYERS_KEY, JSON.stringify(recentPlayers));
+			console.log(`Updated recent players with ${uniquePlayers.length} players from imported data`);
+		} catch (error) {
+			console.error('Failed to save recent players:', error);
 		}
 	}
 
@@ -777,6 +797,25 @@ export class TournamentService {
 		}
 	}
 
+	private transitionPhaseAfterTiebreaker(): void {
+		this.updateStandings();
+
+		// Check if there are more group tiebreakers needed
+		// The new logic will handle multiple group tiebreakers sequentially
+		if (this.requiresGroupTiebreakers()) {
+			return; // Another group needs tiebreaker resolution
+		}
+
+		// No more tiebreakers needed, proceed to next phase
+		if (this.tournamentType === 'round-robin') {
+			this.createFinals(3);
+		} else if (this.tournamentType === 'groups') {
+			this.createPlayoff();
+		} else {
+			this.createThreeGroupFinals();
+		}
+	}
+
 	private createFinals(count: number): void {
 		const sorted = this.getSortedStandings();
 		this.finalists = sorted.slice(0, count).map(s =>
@@ -968,10 +1007,24 @@ export class TournamentService {
 			}));
 		}
 
+		// Convert matches to MatchResult format for storage
+		const matchResults: MatchResult[] = this.matches
+			.filter(match => match.isComplete)
+			.map(match => ({
+				player1Name: this.getPlayerName(match.player1Id),
+				player2Name: this.getPlayerName(match.player2Id),
+				player1Legs: match.player1Legs,
+				player2Legs: match.player2Legs,
+				winnerName: this.getPlayerName(match.winner!),
+				round: match.round,
+				group: match.group
+			}));
+
 		this.weekResults.push({
 			weekNumber: this.weekNumber,
 			players: [...this.players],
 			finalRanking,
+			matches: matchResults,
 			date: new Date(),
 			gameMode: this.gameMode
 		});
@@ -1019,10 +1072,18 @@ export class TournamentService {
 		if (this.tournamentType === 'groups' || this.tournamentType === 'groups-3') {
 			const groupCount = this.tournamentType === 'groups-3' ? 3 : 2;
 
+			// First, check all groups for ties without setting up tiebreakers
+			const groupsWithTies: number[] = [];
 			for (let groupNum = 1; groupNum <= groupCount; groupNum++) {
-				if (this.hasGroupTie(groupNum)) {
-					return true;
+				if (this.checkGroupHasTie(groupNum)) {
+					groupsWithTies.push(groupNum);
 				}
+			}
+
+			// If we found groups with ties, set up tiebreaker for the first one
+			if (groupsWithTies.length > 0) {
+				this.setupGroupTiebreaker(groupsWithTies[0]);
+				return true;
 			}
 		} else if (this.tournamentType === 'round-robin' && this.players.length === 3) {
 			// For 3-player round-robin, check for overall tie
@@ -1032,10 +1093,31 @@ export class TournamentService {
 		return false;
 	}
 
-	private hasGroupTie(groupNum: number): boolean {
+	private checkGroupHasTie(groupNum: number): boolean {
+		// Check if a group has ties without setting up tiebreakers
 		const groupStandings = this.getGroupStandings(groupNum);
+		const tiedGroups = this.findUnresolvableTies(groupStandings);
+		return tiedGroups.length > 0;
+	}
 
-		// Check for ties that can't be resolved by head-to-head
+	private setupGroupTiebreaker(groupNum: number): void {
+		// Set up tiebreaker for a specific group
+		const groupStandings = this.getGroupStandings(groupNum);
+		const tiedGroups = this.findUnresolvableTies(groupStandings);
+
+		if (tiedGroups.length > 0) {
+			this.requiresTiebreaker = true;
+			this.tiebreakerPlayers = tiedGroups.map(s =>
+				this.players.find(p => p.id === s.playerId)!
+			);
+			this.initializeTiebreaker();
+			this.saveTournamentState();
+		}
+	}
+
+	private hasGroupTie(groupNum: number): boolean {
+		// Legacy method - kept for compatibility
+		const groupStandings = this.getGroupStandings(groupNum);
 		const tiedGroups = this.findUnresolvableTies(groupStandings);
 
 		if (tiedGroups.length > 0) {
@@ -1053,11 +1135,12 @@ export class TournamentService {
 	}
 
 	private findUnresolvableTies(standings: Standing[]): Standing[] {
-		// Group players by points and leg difference
+		// Group players by points, leg difference, and tiebreaker score
 		const groups: { [key: string]: Standing[] } = {};
 
 		standings.forEach(standing => {
-			const key = `${standing.points}-${standing.legDifference}`;
+			const tiebreakerScore = standing.tiebreakerScore || 0;
+			const key = `${standing.points}-${standing.legDifference}-${tiebreakerScore}`;
 			if (!groups[key]) {
 				groups[key] = [];
 			}
@@ -1198,35 +1281,24 @@ export class TournamentService {
 			this.completeTournament();
 		} else {
 			// For all other cases, continue to next phase
-			this.transitionPhase();
+			// Skip tiebreaker check since we just resolved one
+			this.transitionPhaseAfterTiebreaker();
 		}
 	}
 
 	private applyTiebreakerResults(totals: { playerId: number; playerName: string; total: number }[]): void {
-		// Update the standings to reflect tiebreaker order
-		// This is a simplified approach - in reality you might want to store tiebreaker results separately
-		// For now, we'll adjust the standings order based on tiebreaker results
-		const tiebreakerWinnerIds = totals.map(t => t.playerId);
-
-		// Resort standings to put tiebreaker winners in correct order
-		this.standings = this.standings.sort((a, b) => {
-			const aIndex = tiebreakerWinnerIds.indexOf(a.playerId);
-			const bIndex = tiebreakerWinnerIds.indexOf(b.playerId);
-
-			// If both are in tiebreaker, sort by tiebreaker order
-			if (aIndex !== -1 && bIndex !== -1) {
-				return aIndex - bIndex;
+		// Apply tiebreaker scores to standings to permanently resolve the tie
+		totals.forEach((total, index) => {
+			const standing = this.standings.find(s => s.playerId === total.playerId);
+			if (standing) {
+				// Set tiebreaker score: higher index = lower score (since totals are sorted by tiebreaker result)
+				// This ensures the tiebreaker winner has the highest tiebreaker score
+				standing.tiebreakerScore = 1000 - index; // 1000, 999, 998, etc.
 			}
-
-			// If only one is in tiebreaker, use normal sorting
-			if (aIndex !== -1) return -1;
-			if (bIndex !== -1) return 1;
-
-			// Neither in tiebreaker, use normal sorting
-			if (a.points !== b.points) return b.points - a.points;
-			if (a.legDifference !== b.legDifference) return b.legDifference - a.legDifference;
-			return 0;
 		});
+
+		// Resort standings using the new tiebreaker scores
+		this.updateStandings();
 	}
 
 	setCurrentMatch(matchId: number): void {
@@ -1255,6 +1327,11 @@ export class TournamentService {
 
 			// Then by leg difference
 			if (b.legDifference !== a.legDifference) return b.legDifference - a.legDifference;
+
+			// If still tied, check tiebreaker scores (higher is better)
+			const aTiebreaker = a.tiebreakerScore || 0;
+			const bTiebreaker = b.tiebreakerScore || 0;
+			if (aTiebreaker !== bTiebreaker) return bTiebreaker - aTiebreaker;
 
 			// If still tied, requires manual tiebreaker (9 dart challenge)
 			// For now, maintain current order as manual resolution needed
@@ -1305,29 +1382,52 @@ export class TournamentService {
 		const playerStats: { [name: string]: SeasonStanding } = {};
 
 		this.weekResults.forEach(week => {
-			week.finalRanking.forEach(ranking => {
-				if (!playerStats[ranking.playerName]) {
-					playerStats[ranking.playerName] = {
-						playerName: ranking.playerName,
+			// Count weeks played by checking ALL players in the tournament
+			week.players.forEach(player => {
+				if (!playerStats[player.name]) {
+					playerStats[player.name] = {
+						playerName: player.name,
 						totalPoints: 0,
 						weeksPlayed: 0,
 						wins: 0,
 						podiumFinishes: 0,
+						goldMedals: 0,
+						silverMedals: 0,
+						bronzeMedals: 0,
 						averagePosition: 0,
 						weeklyResults: []
 					};
 				}
 
-				const player = playerStats[ranking.playerName];
-				player.weeksPlayed++;
-				player.weeklyResults.push({
-					week: week.weekNumber,
-					position: ranking.position,
-					points: ranking.points
-				});
+				const playerStat = playerStats[player.name];
+				playerStat.weeksPlayed++;
 
-				if (ranking.position === 1) player.wins++;
-				if (ranking.position <= 3) player.podiumFinishes++;
+				// Now find this player's ranking in finalRanking for points/position
+				const ranking = week.finalRanking.find(r => r.playerName === player.name);
+				if (ranking) {
+					playerStat.weeklyResults.push({
+						week: week.weekNumber,
+						position: ranking.position,
+						points: ranking.points
+					});
+
+					if (ranking.position === 1) {
+						playerStat.wins++;
+						playerStat.goldMedals++;
+					}
+					if (ranking.position === 2) playerStat.silverMedals++;
+					if (ranking.position === 3) playerStat.bronzeMedals++;
+					if (ranking.position <= 3) playerStat.podiumFinishes++;
+				} else {
+					// Player participated but not in finalRanking (eliminated in groups)
+					// Give them last position for average calculation
+					const lastPosition = week.players.length;
+					playerStat.weeklyResults.push({
+						week: week.weekNumber,
+						position: lastPosition,
+						points: 0
+					});
+				}
 			});
 		});
 

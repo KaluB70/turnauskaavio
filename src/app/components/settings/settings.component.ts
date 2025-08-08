@@ -2,7 +2,7 @@ import {Component} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
 import {TournamentService} from '../../services/tournament.service';
-import {SheetsService} from '../../services/sheets.service';
+import {DriveService} from '../../services/drive.service';
 import {Router} from '@angular/router';
 import {firstValueFrom} from 'rxjs';
 
@@ -15,20 +15,20 @@ import {firstValueFrom} from 'rxjs';
 			<h1 class="text-3xl font-bold text-center mb-8">⚙️ Asetukset</h1>
 
 			<div class="bg-white p-6 rounded-lg shadow-lg mb-6">
-				<h2 class="text-xl font-semibold mb-4">Google Sheets Integration - ÄLÄ KOSKE :)</h2>
+				<h2 class="text-xl font-semibold mb-4">Google Drive Integration</h2>
 
 				<div class="mb-4">
-					<label for="spreadsheetId" class="block text-sm font-medium text-gray-700 mb-2">
-						Spreadsheet ID:
+					<label for="fileId" class="block text-sm font-medium text-gray-700 mb-2">
+						Drive File ID (valinnainen):
 					</label>
 					<input
-						id="spreadsheetId"
+						id="fileId"
 						type="text"
-						[(ngModel)]="spreadsheetId"
-						placeholder="1ABC...XYZ (from Google Sheets URL)"
+						[(ngModel)]="fileId"
+						placeholder="1ABC...XYZ (Google Drive JSON file ID)"
 						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
 					<p class="text-xs text-gray-500 mt-1">
-						Kopioi Google Sheets URL:sta (osa /spreadsheets/d/<strong>TÄMÄ_OSA</strong>/edit)
+						Google Drive JSON-tiedoston ID (jos haluat ladata tiettyä tiedostoa)
 					</p>
 				</div>
 
@@ -43,35 +43,35 @@ import {firstValueFrom} from 'rxjs';
 						placeholder="Google Cloud API Key"
 						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
 					<p class="text-xs text-gray-500 mt-1">
-						Google Cloud API key
+						Google Cloud API key (Drive API:lle)
 					</p>
 				</div>
 
-				<div class="flex gap-3 mb-4">
+				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
 					<button
 						(click)="testConnection()"
-						[disabled]="!spreadsheetId || testing"
-						class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+						[disabled]="!apiKey || testing"
+						class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
 						{{ testing ? 'Testataan...' : 'Testaa yhteys' }}
 					</button>
 
 					<button
 						(click)="saveConfig()"
-						[disabled]="!spreadsheetId"
+						[disabled]="!apiKey"
 						class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
 						Tallenna asetukset
 					</button>
 
 					<button
-						(click)="loadFromSheets()"
+						(click)="loadFromDrive()"
 						[disabled]="!isConfigured || loading"
-						class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed">
-						{{ loading ? 'Ladataan...' : 'Lataa dataa' }}
+						class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+						{{ loading ? 'Ladataan...' : 'Lataa Drive:sta' }}
 					</button>
 
 					<button
 						(click)="generateShareableLink()"
-						[disabled]="!spreadsheetId"
+						[disabled]="!apiKey"
 						class="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed">
 						🔗 Luo jaettava linkki
 					</button>
@@ -106,7 +106,7 @@ import {firstValueFrom} from 'rxjs';
 					</p>
 				</div>
 
-				<div class="grid grid-cols-2 gap-3 mb-4">
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
 					<button
 						(click)="exportData()"
 						class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
@@ -120,14 +120,8 @@ import {firstValueFrom} from 'rxjs';
 					</label>
 
 					<button
-						(click)="exportCSV()"
-						class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700">
-						📊 Vie CSV
-					</button>
-
-					<button
 						(click)="clearAllData()"
-						class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
+						class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 whitespace-nowrap"
 						[disabled]="clearing">
 						🗑️ {{ clearing ? 'Tyhjennetään...' : 'Tyhjennä kaikki' }}
 					</button>
@@ -145,7 +139,7 @@ import {firstValueFrom} from 'rxjs';
 	`
 })
 export class SettingsComponent {
-	spreadsheetId = '';
+	fileId = '';
 	apiKey = '';
 	testing = false;
 	loading = false;
@@ -156,7 +150,7 @@ export class SettingsComponent {
 
 	constructor(
 		private tournamentService: TournamentService,
-		private sheetsService: SheetsService,
+		private driveService: DriveService,
 		private router: Router
 	) {
 		this.loadSavedConfig();
@@ -164,26 +158,40 @@ export class SettingsComponent {
 	}
 
 	private loadSavedConfig(): void {
-		const saved = localStorage.getItem('sheets_config');
+		// Try new drive config first, fallback to old sheets config for migration
+		let saved = localStorage.getItem('drive_config');
+		let configKey = 'drive_config';
+
+		if (!saved) {
+			saved = localStorage.getItem('sheets_config');
+			configKey = 'sheets_config';
+		}
+
 		if (saved) {
 			try {
 				const config = JSON.parse(saved);
-				this.spreadsheetId = config.spreadsheetId || '';
+				this.fileId = config.fileId || config.spreadsheetId || ''; // backward compatibility
 				this.apiKey = config.apiKey || '';
-				this.isConfigured = !!this.spreadsheetId;
+				this.isConfigured = !!this.apiKey;
 
 				if (this.isConfigured) {
-					this.tournamentService.configureGoogleSheets(this.spreadsheetId, this.apiKey);
+					this.tournamentService.configureGoogleDrive(this.apiKey, this.fileId);
+
+					// Migrate from old config if needed
+					if (configKey === 'sheets_config') {
+						const newConfig = { fileId: this.fileId, apiKey: this.apiKey };
+						localStorage.setItem('drive_config', JSON.stringify(newConfig));
+					}
 				}
 			} catch (error) {
-				console.error('Error loading sheets config:', error);
+				console.error('Error loading drive config:', error);
 			}
 		}
 	}
 
 	async testConnection(): Promise<void> {
-		if (!this.spreadsheetId) {
-			this.showStatus('Syötä Spreadsheet ID', 'error');
+		if (!this.apiKey) {
+			this.showStatus('Syötä API Key', 'error');
 			return;
 		}
 
@@ -192,17 +200,17 @@ export class SettingsComponent {
 
 		try {
 			// Configure temporarily for testing
-			this.sheetsService.setConfig({
-				spreadsheetId: this.spreadsheetId,
-				apiKey: this.apiKey
+			this.driveService.setConfig({
+				apiKey: this.apiKey,
+				fileId: this.fileId
 			});
 
-			const success = await firstValueFrom(this.sheetsService.testConnection());
+			const success = await firstValueFrom(this.driveService.testConnection());
 
 			if (success) {
-				this.showStatus('✅ Yhteys Google Sheetsiin onnistui!', 'success');
+				this.showStatus('✅ Yhteys Google Drive API:in onnistui!', 'success');
 			} else {
-				this.showStatus('❌ Yhteys epäonnistui. Tarkista Spreadsheet ID ja julkisuus asetukset.', 'error');
+				this.showStatus('❌ Yhteys epäonnistui. Tarkista API Key ja oikeudet.', 'error');
 			}
 		} catch (error) {
 			this.showStatus('❌ Virhe yhteydessä: ' + error, 'error');
@@ -212,34 +220,34 @@ export class SettingsComponent {
 	}
 
 	saveConfig(): void {
-		if (!this.spreadsheetId) {
-			this.showStatus('Syötä Spreadsheet ID', 'error');
+		if (!this.apiKey) {
+			this.showStatus('Syötä API Key', 'error');
 			return;
 		}
 
 		const config = {
-			spreadsheetId: this.spreadsheetId,
+			fileId: this.fileId,
 			apiKey: this.apiKey
 		};
 
-		localStorage.setItem('sheets_config', JSON.stringify(config));
-		this.tournamentService.configureGoogleSheets(this.spreadsheetId, this.apiKey);
+		localStorage.setItem('drive_config', JSON.stringify(config));
+		this.tournamentService.configureGoogleDrive(this.apiKey, this.fileId);
 		this.isConfigured = true;
 
 		this.showStatus('✅ Asetukset tallennettu!', 'success');
 	}
 
-	async loadFromSheets(): Promise<void> {
+	async loadFromDrive(): Promise<void> {
 		this.loading = true;
 		this.statusMessage = '';
 
 		try {
 			const beforeCount = this.tournamentService.weekResults.length;
-			await this.tournamentService.loadSeasonDataFromSheets();
+			await this.tournamentService.loadSeasonDataFromDrive();
 			const afterCount = this.tournamentService.weekResults.length;
 
 			const newWeeksLoaded = afterCount - beforeCount;
-			let message = '✅ Data ladattu Google Sheetsista!';
+			let message = '✅ Data ladattu Google Drive:sta!';
 
 			if (newWeeksLoaded > 0) {
 				message += ` ${newWeeksLoaded} uutta viikkoa lisätty.`;
@@ -304,53 +312,6 @@ export class SettingsComponent {
 		}
 	}
 
-	exportCSV(): void {
-		try {
-			if (this.tournamentService.weekResults.length === 0) {
-				this.showStatus('❌ Ei dataa vietäväksi', 'error');
-				return;
-			}
-
-			// Create CSV with the same format as expected by Google Sheets
-			let csvContent = 'Viikko,Pvm,Pelaajia,Pelimuoto,Sija,Pelaaja,Pisteet\n';
-
-			this.tournamentService.weekResults.forEach(week => {
-				const dateStr = this.formatDateToFinnish(week.date);
-				const playerCount = week.players.length;
-
-				week.finalRanking.forEach(ranking => {
-					// Ensure playerName is a string and escape any commas by wrapping in quotes
-					const playerName = String(ranking.playerName || '');
-					const escapedPlayerName = playerName.includes(',')
-						? `"${playerName.replace(/"/g, '""')}"`
-						: playerName;
-					csvContent += `${week.weekNumber},${dateStr},${playerCount},${week.gameMode},${ranking.position},${escapedPlayerName},${ranking.points}\n`;
-				});
-			});
-
-			// Add UTF-8 BOM for proper encoding in Excel and other spreadsheet applications
-			const BOM = '\uFEFF';
-			const csvWithBOM = BOM + csvContent;
-
-			// Create blob with proper UTF-8 encoding
-			const blob = new Blob([csvWithBOM], {type: 'text/csv;charset=utf-8;'});
-			const url = window.URL.createObjectURL(blob);
-
-			const exportFileDefaultName = `darts-results-${new Date().toISOString().split('T')[0]}.csv`;
-
-			const linkElement = document.createElement('a');
-			linkElement.setAttribute('href', url);
-			linkElement.setAttribute('download', exportFileDefaultName);
-			linkElement.click();
-
-			// Clean up the URL object
-			window.URL.revokeObjectURL(url);
-
-			this.showStatus('✅ CSV viety onnistuneesti!', 'success');
-		} catch (error) {
-			this.showStatus('❌ CSV vienti epäonnistui: ' + error, 'error');
-		}
-	}
 
 	importData(event: any): void {
 		const file = event.target.files[0];
@@ -377,7 +338,8 @@ export class SettingsComponent {
 				// Import week results
 				this.tournamentService.weekResults = data.weekResults.map((week: any) => ({
 					...week,
-					date: new Date(week.date)
+					date: new Date(week.date),
+					matches: week.matches || [] // Add backwards compatibility
 				}));
 				this.tournamentService.saveWeekResults();
 
@@ -385,6 +347,9 @@ export class SettingsComponent {
 				if (data.activeTournaments) {
 					this.importActiveTournaments(data.activeTournaments);
 				}
+
+				// Populate recent players from imported data
+				this.tournamentService.populateRecentPlayersFromData();
 
 				this.showStatus(`✅ ${data.weekResults.length} viikon data tuotu onnistuneesti!`, 'success');
 
@@ -419,6 +384,7 @@ export class SettingsComponent {
 
 			// Clear active tournaments
 			localStorage.removeItem('darts_tournaments');
+			localStorage.removeItem('darts_recent_players');
 
 			this.showStatus('✅ Kaikki data poistettu!', 'success');
 
@@ -452,16 +418,16 @@ export class SettingsComponent {
 	}
 
 	generateShareableLink(): void {
-		if (!this.spreadsheetId) {
-			this.showStatus('Syötä Spreadsheet ID ensin', 'error');
+		if (!this.apiKey) {
+			this.showStatus('Syötä API Key ensin', 'error');
 			return;
 		}
 
 		const baseUrl = window.location.origin + window.location.pathname;
-		let shareUrl = `${baseUrl}#/settings?sid=${encodeURIComponent(this.spreadsheetId)}`;
+		let shareUrl = `${baseUrl}#/settings?key=${encodeURIComponent(this.apiKey)}`;
 
-		if (this.apiKey) {
-			shareUrl += `&key=${encodeURIComponent(this.apiKey)}`;
+		if (this.fileId) {
+			shareUrl += `&fid=${encodeURIComponent(this.fileId)}`;
 		}
 
 		// Copy to clipboard
@@ -480,24 +446,26 @@ export class SettingsComponent {
 	}
 
 	private loadFromUrl(): void {
-		// Parse URL parameters for spreadsheet ID and API key
+		// Parse URL parameters for file ID and API key
 		const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
-		const sidFromUrl = urlParams.get('sid');
+		const fidFromUrl = urlParams.get('fid');
+		const sidFromUrl = urlParams.get('sid'); // backward compatibility
 		const keyFromUrl = urlParams.get('key');
 
-		if (sidFromUrl) {
-			this.spreadsheetId = sidFromUrl;
-			this.showStatus('🔗 Spreadsheet ID ladattu linkistä', 'info');
+		if (keyFromUrl) {
+			this.apiKey = keyFromUrl;
+			this.fileId = fidFromUrl || sidFromUrl || ''; // prefer fid, fallback to sid for compatibility
 
-			if (keyFromUrl) {
-				this.apiKey = keyFromUrl;
-				this.showStatus('🔗 Spreadsheet ID ja API Key ladattu linkistä', 'info');
+			let message = '🔗 API Key ladattu linkistä';
+			if (this.fileId) {
+				message += ' ja File ID';
 			}
+			this.showStatus(message, 'info');
 
 			// Auto-save and load data
 			setTimeout(async () => {
 				this.saveConfig();
-				await this.loadFromSheets();
+				await this.loadFromDrive();
 			}, 1000);
 		}
 	}

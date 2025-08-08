@@ -2,6 +2,7 @@ import {Component, OnInit, OnDestroy} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {trigger, transition, style, animate} from '@angular/animations';
 import {TournamentService} from '../../services/tournament.service';
+import {SoundService} from '../../services/sound.service';
 
 @Component({
 	selector: 'match-winner',
@@ -28,11 +29,6 @@ import {TournamentService} from '../../services/tournament.service';
 			align-items: center;
 			justify-content: center;
 			outline: none;
-			cursor: pointer;
-			transition: background-color 0.2s ease;
-		}
-		.winner-overlay:hover {
-			background: rgba(0, 0, 0, 0.85);
 		}
 		.winner-card {
 			background: linear-gradient(135deg, #10b981 0%, #059669 100%);
@@ -71,9 +67,7 @@ import {TournamentService} from '../../services/tournament.service';
 		}
 	`],
 	template: `
-		<div class="winner-overlay" @fadeInOut
-		     (keydown)="onKeyDown($event)"
-		     tabindex="0">
+		<div class="winner-overlay" @fadeInOut>
 			<div class="winner-card" @fadeInOut (click)="$event.stopPropagation()">
 				<div class="phase-badge">
 					{{ getPhaseDescription() }}
@@ -86,10 +80,6 @@ import {TournamentService} from '../../services/tournament.service';
 				<div class="text-lg opacity-90 mb-4">
 					{{ getWinnerMessage() }}
 				</div>
-
-				<div class="text-sm opacity-70 mt-4">
-					Klikkaa tai paina välilyöntiä jatkaaksesi
-				</div>
 			</div>
 		</div>
 	`
@@ -98,20 +88,33 @@ export class MatchWinnerComponent implements OnInit, OnDestroy {
 	private timer: any;
 	private isSkipped = false;
 
-	constructor(public tournamentService: TournamentService) {}
+	constructor(
+		public tournamentService: TournamentService,
+		private soundService: SoundService
+	) {}
 
 	ngOnInit(): void {
+		// Play appropriate sound based on the type of win
+		const isFinal = this.isFinalMatch();
+		const matchesComplete = this.tournamentService.matches.filter(m => m.isComplete).length;
+		const totalMatches = this.tournamentService.matches.length;
+		
+		// Check if tournament is actually completed (regardless of phase detection issues)
+		const isActuallyComplete = this.tournamentService.tournamentCompleted;
+		
+		// For 3-player tournaments, the 3rd match is always the tournament winner
+		const isThirdMatchIn3Player = this.tournamentService.players.length === 3 && matchesComplete === totalMatches;
+		
+		// Also play tournament sound for final phase matches or completed tournaments
+		if (isFinal || this.tournamentService.currentPhase === 'final' || isActuallyComplete || isThirdMatchIn3Player) {
+			this.soundService.playTournamentWon();
+		} else {
+			this.soundService.playMatchWon();
+		}
+
 		this.timer = setTimeout(() => {
 			this.continue();
 		}, 4000);
-
-		// Delay focus to prevent immediate triggering
-		setTimeout(() => {
-			const overlay = document.querySelector('.winner-overlay') as HTMLElement;
-			if (overlay && !this.isSkipped) {
-				overlay.focus();
-			}
-		}, 500);
 	}
 
 	ngOnDestroy(): void {
@@ -120,14 +123,6 @@ export class MatchWinnerComponent implements OnInit, OnDestroy {
 		}
 	}
 
-	onKeyDown(event: KeyboardEvent): void {
-		// Only respond to intentional key presses, not programmatic ones
-		if (event.isTrusted && (event.key === 'Enter' || event.key === ' ' || event.code === 'Space')) {
-			event.preventDefault();
-			event.stopPropagation();
-			this.continue();
-		}
-	}
 
 	getPhaseDescription(): string {
 		return this.tournamentService.getCurrentPhaseDescription();

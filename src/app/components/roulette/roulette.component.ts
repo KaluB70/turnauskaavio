@@ -2,6 +2,7 @@ import {Component, OnDestroy, OnInit} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {animate, style, transition, trigger} from '@angular/animations';
 import {TournamentService} from '../../services/tournament.service';
+import {SoundService} from '../../services/sound.service';
 
 @Component({
 	selector: 'roulette',
@@ -165,15 +166,24 @@ export class RouletteComponent implements OnInit, OnDestroy {
 
 	confettiColors = ['#fbbf24', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#f59e0b'];
 
-	constructor(protected tournamentService: TournamentService) {}
+	constructor(
+		protected tournamentService: TournamentService,
+		private soundService: SoundService
+	) {}
 
 	ngOnInit(): void {
 		this.setupAnimation();
 		this.startAnimation();
+		// Delay sound slightly to ensure user interaction has been registered
+		setTimeout(() => {
+			this.soundService.playRouletteSpinning();
+		}, 100);
 	}
 
 	ngOnDestroy(): void {
 		this.intervals.forEach(interval => clearInterval(interval));
+		// Stop any playing roulette sounds when component is destroyed
+		this.soundService.stopRouletteSpinning();
 	}
 
 	private setupAnimation(): void {
@@ -265,6 +275,12 @@ export class RouletteComponent implements OnInit, OnDestroy {
 		const lockInterval = setInterval(() => {
 			if (this.lockedPlayers.length < this.displayPlayers.length) {
 				this.lockedPlayers.push(this.lockedPlayers.length);
+				// Play lock sound for each player
+				this.soundService.playRouletteLock();
+				
+				// Speed up roulette sound based on how many are locked
+				const speedMultiplier = 1.0 + (this.lockedPlayers.length * 0.3);
+				this.soundService.speedUpRouletteSpin(speedMultiplier);
 
 				if (this.lockedPlayers.length === this.displayPlayers.length) {
 					this.currentTitle = 'Pelausjärjestys arvottu!';
@@ -272,6 +288,10 @@ export class RouletteComponent implements OnInit, OnDestroy {
 						? 'Finaalin järjestys on valmis'
 						: 'Turnausasetelma on valmis';
 					this.allLocked = true;
+					// Play roulette finished sound
+					setTimeout(() => {
+						this.soundService.playRouletteFinished();
+					}, 300);
 					clearInterval(lockInterval);
 
 					// Update the actual tournament service with the shuffled order
@@ -302,6 +322,13 @@ export class RouletteComponent implements OnInit, OnDestroy {
 					if (lockedInGroup < group.length) {
 						this.lockedGroupPlayers[groupIndex].push(lockedInGroup);
 						totalLocked++;
+						// Play lock sound for each player
+						this.soundService.playRouletteLock();
+						
+						// Speed up roulette sound based on how many are locked
+						const speedMultiplier = 1.0 + (totalLocked * 0.2);
+						this.soundService.speedUpRouletteSpin(speedMultiplier);
+						
 						break;
 					}
 				}
@@ -314,6 +341,10 @@ export class RouletteComponent implements OnInit, OnDestroy {
 						? 'Kaikki pelaajat on jaettu kolmeen lohkoon'
 						: 'Kaikki pelaajat on jaettu lohkoihin';
 					this.allLocked = true;
+					// Play roulette finished sound
+					setTimeout(() => {
+						this.soundService.playRouletteFinished();
+					}, 300);
 					clearInterval(lockInterval);
 
 					// Update tournament service with group assignments

@@ -1,15 +1,17 @@
 import {TestBed} from '@angular/core/testing';
+import {HttpClientTestingModule} from '@angular/common/http/testing';
 import {Match, TournamentService} from './tournament.service';
-import {SheetsService} from './sheets.service';
+import {DriveService} from './drive.service';
 
 describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 	let service: TournamentService;
 
 	beforeEach(() => {
 		TestBed.configureTestingModule({
+			imports: [HttpClientTestingModule],
 			providers: [
 				TournamentService,
-				{ provide: SheetsService, useValue: jasmine.createSpyObj('SheetsService', ['setConfig', 'fetchSheetData', 'testConnection']) }
+				{ provide: DriveService, useValue: jasmine.createSpyObj('DriveService', ['setConfig', 'fetchFileContent', 'testConnection', 'listFiles', 'getFileMetadata']) }
 			]
 		});
 		service = TestBed.inject(TournamentService);
@@ -453,6 +455,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 						{playerId: 1, playerName: 'Alice', position: 1, points: 5},
 						{playerId: 2, playerName: 'Bob', position: 2, points: 3}
 					],
+					matches: [],
 					date: new Date('2024-01-01'),
 					gameMode: '301'
 				},
@@ -463,6 +466,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 						{playerId: 2, playerName: 'Bob', position: 1, points: 5},
 						{playerId: 1, playerName: 'Alice', position: 2, points: 3}
 					],
+					matches: [],
 					date: new Date('2024-01-08'),
 					gameMode: '301'
 				}
@@ -494,6 +498,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 					finalRanking: [
 						{playerId: 1, playerName: 'Alice', position: 1, points: week % 2 === 0 ? 5 : 1}
 					],
+					matches: [],
 					date: new Date(`2024-01-${week}`),
 					gameMode: '301'
 				});
@@ -540,6 +545,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 				weekNumber: 1,
 				players: [],
 				finalRanking: [],
+				matches: [],
 				date: new Date(),
 				gameMode: '301'
 			});

@@ -3,6 +3,7 @@ import {CommonModule} from '@angular/common';
 import {Router} from '@angular/router';
 import {trigger, transition, style, animate} from '@angular/animations';
 import {TournamentService} from '../../services/tournament.service';
+import {SoundService} from '../../services/sound.service';
 
 @Component({
 	selector: 'tournament-ended',
@@ -93,8 +94,7 @@ import {TournamentService} from '../../services/tournament.service';
 				<!-- Header -->
 				<div class="text-center mb-8" @slideIn>
 					<div class="trophy-glow text-8xl mb-4">🏆</div>
-					<h1 class="text-5xl md:text-6xl font-bold mb-2">VIIKKOKISAT</h1>
-					<h2 class="text-3xl md:text-4xl font-semibold mb-4">PÄÄTTYNYT!</h2>
+					<h1 class="text-5xl md:text-6xl font-bold mb-2">KULTAMESTARI</h1>
 					<div class="text-xl opacity-90">Viikko {{ tournamentService.weekNumber }}</div>
 				</div>
 
@@ -186,16 +186,11 @@ import {TournamentService} from '../../services/tournament.service';
 				</div>
 
 				<!-- Actions -->
-				<div class="text-center space-x-4" @fadeIn>
+				<div class="text-center" @fadeIn>
 					<button
 						(click)="viewSeasonStandings()"
 						class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition-colors shadow-lg">
 						📈 Katso kauden tilastot
-					</button>
-					<button
-						(click)="startNewWeek()"
-						class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors shadow-lg">
-						🎯 Uudet viikkokisat
 					</button>
 				</div>
 
@@ -212,14 +207,18 @@ import {TournamentService} from '../../services/tournament.service';
 export class TournamentEndedComponent implements OnInit {
 	constructor(
 		public tournamentService: TournamentService,
-		private router: Router
+		private router: Router,
+		private soundService: SoundService
 	) {}
 
 	ngOnInit(): void {
-		// Auto-advance to season standings after 15 seconds
+		// Play tournament won sound when the end screen appears
+		this.soundService.playTournamentWon();
+
+		// Auto-advance to season standings after 30 seconds
 		setTimeout(() => {
 			this.viewSeasonStandings();
-		}, 15000);
+		}, 30000);
 	}
 
 	getWinner() {
@@ -249,10 +248,5 @@ export class TournamentEndedComponent implements OnInit {
 
 	viewSeasonStandings(): void {
 		this.router.navigate(['/standings']);
-	}
-
-	startNewWeek(): void {
-		this.tournamentService.reset();
-		this.router.navigate(['/']);
 	}
 }

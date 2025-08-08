@@ -1,16 +1,16 @@
 import {TournamentService} from './tournament.service';
-import {SheetsService} from './sheets.service';
+import {DriveService} from './drive.service';
 
 describe('TournamentService Edge Cases', () => {
   let service: TournamentService;
-  let mockSheetsService: jasmine.SpyObj<SheetsService>;
+  let mockDriveService: jasmine.SpyObj<DriveService>;
 
   beforeEach(() => {
-    // Create mock sheets service
-    mockSheetsService = jasmine.createSpyObj('SheetsService', ['setConfig', 'fetchSheetData', 'testConnection']);
+    // Create mock drive service
+    mockDriveService = jasmine.createSpyObj('DriveService', ['setConfig', 'fetchFileContent', 'testConnection', 'listFiles', 'getFileMetadata']);
 
     // Create service with mocked dependency
-    service = new TournamentService(mockSheetsService);
+    service = new TournamentService(mockDriveService);
 
     // Mock localStorage to prevent actual persistence during tests
     spyOn(localStorage, 'getItem').and.returnValue(null);
