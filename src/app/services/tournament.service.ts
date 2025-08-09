@@ -1,6 +1,6 @@
-import {Injectable} from '@angular/core';
-import {DriveService} from './drive.service';
-import {firstValueFrom} from 'rxjs';
+import { Injectable } from '@angular/core';
+import { DriveService } from './drive.service';
+import { firstValueFrom } from 'rxjs';
 
 export interface Player {
 	id: number;
@@ -99,11 +99,11 @@ export class TournamentService {
 	// Tiebreaker state
 	requiresTiebreaker = false;
 	tiebreakerPlayers: Player[] = [];
-	tiebreakerScores: { [playerId: number]: number[] } = {};
+	tiebreakerScores: Record<number, number[]> = {};
 
 	// Tiebreaker UI state (for refresh persistence)
 	tiebreakerUIState = {
-		currentRoundScores: {} as { [playerId: number]: number[] },
+		currentRoundScores: {} as Record<number, number[]>,
 		showResults: false,
 		results: [] as { playerName: string; total: number }[],
 		stillTied: false
@@ -186,7 +186,7 @@ export class TournamentService {
 
 
 	private mergeWeekResults(driveResults: WeekResult[], localResults: WeekResult[]): WeekResult[] {
-		const merged = [...localResults];
+		const merged = [ ...localResults ];
 		let newWeeksAdded = 0;
 
 		driveResults.forEach(driveResult => {
@@ -209,7 +209,7 @@ export class TournamentService {
 		if (!saved) {
 			saved = localStorage.getItem('sheets_config');
 		}
-		
+
 		if (saved) {
 			try {
 				const config = JSON.parse(saved);
@@ -291,7 +291,7 @@ export class TournamentService {
 					allPlayers.add(player.name.trim());
 				}
 			});
-			
+
 			week.finalRanking.forEach(ranking => {
 				if (ranking.playerName?.trim()) {
 					allPlayers.add(ranking.playerName.trim());
@@ -559,7 +559,7 @@ export class TournamentService {
 
 	private setupGroups(): void {
 		this.matches = [];
-		const shuffled = [...this.players].sort(() => Math.random() - 0.5);
+		const shuffled = [ ...this.players ].sort(() => Math.random() - 0.5);
 		const group1Size = Math.ceil(shuffled.length / 2);
 
 		shuffled.forEach((player, index) => {
@@ -570,7 +570,7 @@ export class TournamentService {
 		const allGroupMatches: {player1Id: number, player2Id: number, group: number}[] = [];
 
 		// Create all matches for each group
-		[1, 2].forEach(groupNum => {
+		[ 1, 2 ].forEach(groupNum => {
 			const groupPlayers = shuffled.filter(p => p.group === groupNum);
 			const groupMatches: {player1Id: number, player2Id: number}[] = [];
 
@@ -586,7 +586,7 @@ export class TournamentService {
 			// Sort matches within each group for better alternation
 			const sortedGroupMatches = this.alternateMatchOrder(groupMatches);
 			sortedGroupMatches.forEach(match => {
-				allGroupMatches.push({...match, group: groupNum});
+				allGroupMatches.push({ ...match, group: groupNum });
 			});
 		});
 
@@ -621,7 +621,7 @@ export class TournamentService {
 
 	private setupThreeGroups(): void {
 		this.matches = [];
-		const shuffled = [...this.players].sort(() => Math.random() - 0.5);
+		const shuffled = [ ...this.players ].sort(() => Math.random() - 0.5);
 		const playersPerGroup = Math.ceil(shuffled.length / 3);
 
 		shuffled.forEach((player, index) => {
@@ -632,7 +632,7 @@ export class TournamentService {
 		const allGroupMatches: {player1Id: number, player2Id: number, group: number}[] = [];
 
 		// Create all matches for each group
-		[1, 2, 3].forEach(groupNum => {
+		[ 1, 2, 3 ].forEach(groupNum => {
 			const groupPlayers = shuffled.filter(p => p.group === groupNum);
 			const groupMatches: {player1Id: number, player2Id: number}[] = [];
 
@@ -648,7 +648,7 @@ export class TournamentService {
 			// Sort matches within each group for better alternation
 			const sortedGroupMatches = this.alternateMatchOrder(groupMatches);
 			sortedGroupMatches.forEach(match => {
-				allGroupMatches.push({...match, group: groupNum});
+				allGroupMatches.push({ ...match, group: groupNum });
 			});
 		});
 
@@ -683,8 +683,8 @@ export class TournamentService {
 
 	private alternateMatchOrder(matches: {player1Id: number, player2Id: number}[]): {player1Id: number, player2Id: number}[] {
 		const result: {player1Id: number, player2Id: number}[] = [];
-		const remaining = [...matches];
-		const playerLastMatchIndex: {[playerId: number]: number} = {};
+		const remaining = [ ...matches ];
+		const playerLastMatchIndex: Record<number, number> = {};
 
 		while (remaining.length > 0) {
 			// Find the best match to add next - one where both players haven't played recently
@@ -717,7 +717,7 @@ export class TournamentService {
 
 	private interleaveGroupMatches(groupMatches: {player1Id: number, player2Id: number, group: number}[]): {player1Id: number, player2Id: number, group: number}[] {
 		// Group matches by group number
-		const matchesByGroup: {[group: number]: {player1Id: number, player2Id: number, group: number}[]} = {};
+		const matchesByGroup: Record<number, {player1Id: number, player2Id: number, group: number}[]> = {};
 		groupMatches.forEach(match => {
 			if (!matchesByGroup[match.group]) {
 				matchesByGroup[match.group] = [];
@@ -1000,7 +1000,7 @@ export class TournamentService {
 			});
 
 			// Add any remaining player (who didn't finish) as last
-			const allFinalPlayers = [finalMatch.player1Id, finalMatch.player2Id, finalMatch.player3Id!];
+			const allFinalPlayers = [ finalMatch.player1Id, finalMatch.player2Id, finalMatch.player3Id! ];
 			const unfinishedPlayer = allFinalPlayers.find(id => !finalMatch.finishOrder!.includes(id));
 			if (unfinishedPlayer) {
 				rankedPlayers.push({
@@ -1013,7 +1013,7 @@ export class TournamentService {
 				playerId: player.playerId,
 				playerName: player.playerName,
 				position: index + 1,
-				points: [5, 3, 1, 0][index] || 0
+				points: [ 5, 3, 1, 0 ][index] || 0
 			}));
 		} else {
 			// Use regular standings for non-3-way finals
@@ -1021,7 +1021,7 @@ export class TournamentService {
 				playerId: s.playerId,
 				playerName: s.playerName,
 				position: index + 1,
-				points: [5, 3, 1, 0][index] || 0
+				points: [ 5, 3, 1, 0 ][index] || 0
 			}));
 		}
 
@@ -1040,7 +1040,7 @@ export class TournamentService {
 
 		this.weekResults.push({
 			weekNumber: this.weekNumber,
-			players: [...this.players],
+			players: [ ...this.players ],
 			finalRanking,
 			matches: matchResults,
 			date: new Date(),
@@ -1136,7 +1136,7 @@ export class TournamentService {
 
 	private findUnresolvableTies(standings: Standing[]): Standing[] {
 		// Group players by points, leg difference, and tiebreaker score
-		const groups: { [key: string]: Standing[] } = {};
+		const groups: Record<string, Standing[]> = {};
 
 		standings.forEach(standing => {
 			const tiebreakerScore = standing.tiebreakerScore || 0;
@@ -1149,8 +1149,8 @@ export class TournamentService {
 
 		// Find the highest scoring group that has ties
 		const sortedGroupKeys = Object.keys(groups).sort((a, b) => {
-			const [aPoints, aLegDiff] = a.split('-').map(Number);
-			const [bPoints, bLegDiff] = b.split('-').map(Number);
+			const [ aPoints, aLegDiff ] = a.split('-').map(Number);
+			const [ bPoints, bLegDiff ] = b.split('-').map(Number);
 			if (aPoints !== bPoints) return bPoints - aPoints;
 			return bLegDiff - aLegDiff;
 		});
@@ -1230,7 +1230,7 @@ export class TournamentService {
 
 	// Methods for tiebreaker UI state management
 	updateTiebreakerUIState(uiState: {
-		currentRoundScores?: { [playerId: number]: number[] },
+		currentRoundScores?: Record<number, number[]>,
 		showResults?: boolean,
 		results?: { playerName: string; total: number }[],
 		stillTied?: boolean
@@ -1315,7 +1315,7 @@ export class TournamentService {
 	}
 
 	getSortedStandings(): Standing[] {
-		return [...this.standings].sort((a, b) => {
+		return [ ...this.standings ].sort((a, b) => {
 			// First by points
 			if (a.points !== b.points) return b.points - a.points;
 
@@ -1371,7 +1371,7 @@ export class TournamentService {
 	}
 
 	getSeasonStandings(): SeasonStanding[] {
-		const playerStats: { [name: string]: SeasonStanding } = {};
+		const playerStats: Record<string, SeasonStanding> = {};
 
 		this.weekResults.forEach(week => {
 			// Count weeks played by checking ALL players in the tournament
@@ -1470,7 +1470,7 @@ export class TournamentService {
 			if (!saved) return [];
 
 			const tournaments = JSON.parse(saved);
-			return Object.entries(tournaments).map(([id, data]: [string, any]) => ({
+			return Object.entries(tournaments).map(([ id, data ]: [string, any]) => ({
 				id,
 				players: data.players?.map((p: any) => p.name) || [],
 				phase: this.getPhaseDescription(data.currentPhase, data.tournamentType),

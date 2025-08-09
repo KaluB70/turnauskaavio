@@ -1,17 +1,17 @@
-import {TestBed} from '@angular/core/testing';
-import {HttpClientTestingModule} from '@angular/common/http/testing';
-import {Match, TournamentService} from './tournament.service';
-import {DriveService} from './drive.service';
+import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { Match, TournamentService } from './tournament.service';
+import { DriveService } from './drive.service';
 
 describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 	let service: TournamentService;
 
 	beforeEach(() => {
 		TestBed.configureTestingModule({
-			imports: [HttpClientTestingModule],
+			imports: [ HttpClientTestingModule ],
 			providers: [
 				TournamentService,
-				{ provide: DriveService, useValue: jasmine.createSpyObj('DriveService', ['setConfig', 'fetchFileContent', 'testConnection', 'listFiles', 'getFileMetadata']) }
+				{ provide: DriveService, useValue: jasmine.createSpyObj('DriveService', [ 'setConfig', 'fetchFileContent', 'testConnection', 'listFiles', 'getFileMetadata' ]) }
 			]
 		});
 		service = TestBed.inject(TournamentService);
@@ -31,7 +31,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 
 	describe('Registration and Tournament Type Selection', () => {
 		it('should register 3 players for round robin tournament', () => {
-			const players = ['Alice', 'Bob', 'Charlie'];
+			const players = [ 'Alice', 'Bob', 'Charlie' ];
 			const tournamentId = service.register(players, '301', 3, 1);
 
 			expect(service.players.length).toBe(3);
@@ -42,7 +42,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 		});
 
 		it('should register 4-5 players for round robin tournament', () => {
-			const players = ['P1', 'P2', 'P3', 'P4', 'P5'];
+			const players = [ 'P1', 'P2', 'P3', 'P4', 'P5' ];
 			service.register(players, '501', 5, 2);
 
 			expect(service.players.length).toBe(5);
@@ -53,7 +53,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 		});
 
 		it('should register 6+ players for group tournament', () => {
-			const players = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
+			const players = [ 'P1', 'P2', 'P3', 'P4', 'P5', 'P6' ];
 			service.register(players, '301', 3, 1);
 
 			expect(service.players.length).toBe(6);
@@ -76,14 +76,14 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 
 		it('should throw error for insufficient players', () => {
 			expect(() => {
-				service.register(['P1', 'P2'], '301', 3, 1);
+				service.register([ 'P1', 'P2' ], '301', 3, 1);
 			}).toThrowError('Vähintään 3 pelaajaa tarvitaan');
 		});
 	});
 
 	describe('Match Completion and Standings Updates', () => {
 		beforeEach(() => {
-			service.register(['Alice', 'Bob', 'Charlie'], '301', 3, 1);
+			service.register([ 'Alice', 'Bob', 'Charlie' ], '301', 3, 1);
 			service.startTournament();
 		});
 
@@ -134,7 +134,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 		let matches: Match[];
 
 		beforeEach(() => {
-			service.register(['Alice', 'Bob', 'Charlie'], '301', 3, 1);
+			service.register([ 'Alice', 'Bob', 'Charlie' ], '301', 3, 1);
 			service.startTournament();
 			matches = service.matches.filter(m => m.round === 'group');
 		});
@@ -270,14 +270,14 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 
 	describe('Tiebreaker System', () => {
 		beforeEach(() => {
-			service.register(['Alice', 'Bob', 'Charlie'], '301', 3, 1);
+			service.register([ 'Alice', 'Bob', 'Charlie' ], '301', 3, 1);
 
 			// Create perfect 3-way tie scenario
 			service.requiresTiebreaker = true;
 			service.tiebreakerPlayers = [
-				{id: 1, name: 'Alice'},
-				{id: 2, name: 'Bob'},
-				{id: 3, name: 'Charlie'}
+				{ id: 1, name: 'Alice' },
+				{ id: 2, name: 'Bob' },
+				{ id: 3, name: 'Charlie' }
 			];
 			service.initializeTiebreaker();
 		});
@@ -335,7 +335,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 
 	describe('4-5 Player Round Robin Tournament', () => {
 		beforeEach(() => {
-			service.register(['Alice', 'Bob', 'Charlie', 'Dave'], '301', 3, 1);
+			service.register([ 'Alice', 'Bob', 'Charlie', 'Dave' ], '301', 3, 1);
 			service.startTournament();
 		});
 
@@ -368,7 +368,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 
 	describe('Group Tournament (6+ Players)', () => {
 		beforeEach(() => {
-			service.register(['P1', 'P2', 'P3', 'P4', 'P5', 'P6'], '301', 3, 1);
+			service.register([ 'P1', 'P2', 'P3', 'P4', 'P5', 'P6' ], '301', 3, 1);
 			service.startTournament();
 		});
 
@@ -401,7 +401,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 
 	describe('Tournament State Management', () => {
 		it('should save and load tournament state correctly', () => {
-			const players = ['Alice', 'Bob', 'Charlie'];
+			const players = [ 'Alice', 'Bob', 'Charlie' ];
 			const tournamentId = service.register(players, '301', 3, 1);
 
 			service.startTournament();
@@ -413,7 +413,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 			service.completeMatch(match.player1Id);
 
 			// Create new service instance and load
-			const mockSheetsService = jasmine.createSpyObj('SheetsService', ['setConfig', 'fetchSheetData', 'testConnection']);
+			const mockSheetsService = jasmine.createSpyObj('SheetsService', [ 'setConfig', 'fetchSheetData', 'testConnection' ]);
 			const newService = new TournamentService(mockSheetsService);
 			const loaded = newService.loadTournament(tournamentId);
 
@@ -429,7 +429,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 		});
 
 		it('should reset tournament state completely', () => {
-			service.register(['Alice', 'Bob', 'Charlie'], '301', 3, 1);
+			service.register([ 'Alice', 'Bob', 'Charlie' ], '301', 3, 1);
 			service.startTournament();
 
 			service.reset();
@@ -450,10 +450,10 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 			service.weekResults = [
 				{
 					weekNumber: 1,
-					players: [{id: 1, name: 'Alice'}, {id: 2, name: 'Bob'}],
+					players: [ { id: 1, name: 'Alice' }, { id: 2, name: 'Bob' } ],
 					finalRanking: [
-						{playerId: 1, playerName: 'Alice', position: 1, points: 5},
-						{playerId: 2, playerName: 'Bob', position: 2, points: 3}
+						{ playerId: 1, playerName: 'Alice', position: 1, points: 5 },
+						{ playerId: 2, playerName: 'Bob', position: 2, points: 3 }
 					],
 					matches: [],
 					date: new Date('2024-01-01'),
@@ -461,10 +461,10 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 				},
 				{
 					weekNumber: 2,
-					players: [{id: 1, name: 'Alice'}, {id: 2, name: 'Bob'}],
+					players: [ { id: 1, name: 'Alice' }, { id: 2, name: 'Bob' } ],
 					finalRanking: [
-						{playerId: 2, playerName: 'Bob', position: 1, points: 5},
-						{playerId: 1, playerName: 'Alice', position: 2, points: 3}
+						{ playerId: 2, playerName: 'Bob', position: 1, points: 5 },
+						{ playerId: 1, playerName: 'Alice', position: 2, points: 3 }
 					],
 					matches: [],
 					date: new Date('2024-01-08'),
@@ -494,9 +494,9 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 			for (let week = 3; week <= 10; week++) {
 				service.weekResults.push({
 					weekNumber: week,
-					players: [{id: 1, name: 'Alice'}],
+					players: [ { id: 1, name: 'Alice' } ],
 					finalRanking: [
-						{playerId: 1, playerName: 'Alice', position: 1, points: week % 2 === 0 ? 5 : 1}
+						{ playerId: 1, playerName: 'Alice', position: 1, points: week % 2 === 0 ? 5 : 1 }
 					],
 					matches: [],
 					date: new Date(`2024-01-${week}`),
@@ -515,7 +515,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 
 	describe('Utility Functions', () => {
 		beforeEach(() => {
-			service.register(['Alice', 'Bob', 'Charlie'], '301', 3, 1);
+			service.register([ 'Alice', 'Bob', 'Charlie' ], '301', 3, 1);
 		});
 
 		it('should get player names correctly', () => {
@@ -577,12 +577,12 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 	describe('Edge Cases and Error Handling', () => {
 		it('should handle registration edge cases gracefully', () => {
 			expect(() => {
-				service.register(['', '  ', 'ValidName'], '301', 3, 1);
+				service.register([ '', '  ', 'ValidName' ], '301', 3, 1);
 			}).not.toThrow();
 		});
 
 		it('should handle match operations with invalid data', () => {
-			service.register(['Alice', 'Bob', 'Charlie'], '301', 3, 1);
+			service.register([ 'Alice', 'Bob', 'Charlie' ], '301', 3, 1);
 			service.startTournament();
 
 			// Complete with invalid winner should still complete the match
@@ -595,7 +595,7 @@ describe('TournamentService - Comprehensive Tournament Logic Tests', () => {
 			spyOn(Storage.prototype, 'setItem').and.throwError('Storage full');
 
 			expect(() => {
-				service.register(['Alice', 'Bob', 'Charlie'], '301', 3, 1);
+				service.register([ 'Alice', 'Bob', 'Charlie' ], '301', 3, 1);
 			}).not.toThrow();
 		});
 	});

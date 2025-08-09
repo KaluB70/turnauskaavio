@@ -1,7 +1,7 @@
-import {Injectable} from '@angular/core';
-import {HttpClient} from '@angular/common/http';
-import {Observable, catchError, of} from 'rxjs';
-import {map} from 'rxjs/operators';
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, catchError, of } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 export interface DriveConfig {
 	apiKey: string;
@@ -102,7 +102,7 @@ export class DriveService {
 			);
 		}
 
-		// Otherwise, just test the API key with a simple about endpoint
+		// Otherwise, test the API key with a simple about endpoint
 		const url = `https://www.googleapis.com/drive/v3/about?fields=kind&key=${this.config.apiKey}`;
 
 		return this.http.get(url).pipe(

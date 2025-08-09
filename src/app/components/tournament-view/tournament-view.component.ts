@@ -1,12 +1,12 @@
-import {Component, OnInit} from '@angular/core';
-import {CommonModule} from '@angular/common';
-import {ActivatedRoute, Router} from '@angular/router';
-import {TournamentService} from '../../services/tournament.service';
-import {TournamentBracketComponent} from '../tournament-bracket/tournament-bracket.component';
-import {CurrentMatchComponent} from '../current-match/current-match.component';
-import {RouletteComponent} from "../roulette/roulette.component";
-import {TiebreakerComponent} from '../tiebreaker/tiebreaker.component';
-import {TournamentEndedComponent} from '../tournament-ended/tournament-ended.component';
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
+import { TournamentService } from '../../services/tournament.service';
+import { TournamentBracketComponent } from '../tournament-bracket/tournament-bracket.component';
+import { CurrentMatchComponent } from '../current-match/current-match.component';
+import { RouletteComponent } from "../roulette/roulette.component";
+import { TiebreakerComponent } from '../tiebreaker/tiebreaker.component';
+import { TournamentEndedComponent } from '../tournament-ended/tournament-ended.component';
 
 @Component({
 	selector: 'tournament-view',
@@ -19,10 +19,35 @@ import {TournamentEndedComponent} from '../tournament-ended/tournament-ended.com
 		TiebreakerComponent,
 		TournamentEndedComponent
 	],
+	styles: [ `
+		.match-bg {
+			background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 75%, #475569 100%);
+			min-height: 100vh;
+			position: relative;
+			overflow: hidden;
+		}
+		.match-bg::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background:
+				radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+				radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+		}
+		.glass-card {
+			background: rgba(255, 255, 255, 0.1);
+			backdrop-filter: blur(20px);
+			border: 1px solid rgba(255, 255, 255, 0.2);
+			box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+		}
+	` ],
 	template: `
 		<tournament-ended *ngIf="tournamentService.tournamentCompleted"></tournament-ended>
 		<roulette *ngIf="tournamentService.showRoulette && !tournamentService.tournamentCompleted"></roulette>
-		<div *ngIf="!tournamentService.showRoulette && !tournamentService.tournamentCompleted" class="container mx-auto px-4 py-8">
+		<div *ngIf="!tournamentService.showRoulette && !tournamentService.tournamentCompleted" class="w-full">
 			<div *ngIf="!tournamentExists">
 				<h1 class="text-3xl font-bold text-center mb-8">🎯 Turnausta ei löytynyt</h1>
 				<div class="text-center">
@@ -39,12 +64,18 @@ import {TournamentEndedComponent} from '../tournament-ended/tournament-ended.com
 					<tiebreaker></tiebreaker>
 				</div>
 
-				<div *ngIf="tournamentService.currentMatch && !tournamentService.requiresTiebreaker" class="mb-8">
-					<current-match></current-match>
+				<div *ngIf="tournamentService.currentMatch && !tournamentService.requiresTiebreaker">
+					<current-match>
+						<tournament-bracket></tournament-bracket>
+					</current-match>
 				</div>
 
-				<div class="mb-8">
-					<tournament-bracket></tournament-bracket>
+				<div *ngIf="!tournamentService.currentMatch" class="match-bg min-h-screen relative">
+					<div class="w-full px-4 py-8 relative z-20">
+						<div class="glass-card rounded-2xl p-8 shadow-xl max-w-6xl mx-auto mb-8">
+							<tournament-bracket></tournament-bracket>
+						</div>
+					</div>
 				</div>
 
 				<div *ngIf="!tournamentService.currentMatch && tournamentService.isStarted && !tournamentService.requiresTiebreaker" class="mt-8 text-center">
@@ -80,6 +111,6 @@ export class TournamentComponent implements OnInit {
 	}
 
 	goHome(): void {
-		void this.router.navigate(['/']);
+		void this.router.navigate([ '/' ]);
 	}
 }

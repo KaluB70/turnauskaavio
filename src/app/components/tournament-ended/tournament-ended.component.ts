@@ -1,35 +1,35 @@
-import {Component, OnInit} from '@angular/core';
-import {CommonModule} from '@angular/common';
-import {Router} from '@angular/router';
-import {trigger, transition, style, animate} from '@angular/animations';
-import {TournamentService} from '../../services/tournament.service';
-import {SoundService} from '../../services/sound.service';
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
+import { trigger, transition, style, animate } from '@angular/animations';
+import { TournamentService } from '../../services/tournament.service';
+import { SoundService } from '../../services/sound.service';
 
 @Component({
 	selector: 'tournament-ended',
 	standalone: true,
-	imports: [CommonModule],
+	imports: [ CommonModule ],
 	animations: [
 		trigger('slideIn', [
 			transition(':enter', [
-				style({transform: 'translateY(100%)', opacity: 0}),
-				animate('0.8s ease-out', style({transform: 'translateY(0)', opacity: 1}))
+				style({ transform: 'translateY(100%)', opacity: 0 }),
+				animate('0.8s ease-out', style({ transform: 'translateY(0)', opacity: 1 }))
 			])
 		]),
 		trigger('fadeIn', [
 			transition(':enter', [
-				style({opacity: 0, transform: 'scale(0.8)'}),
-				animate('0.6s 0.3s ease-out', style({opacity: 1, transform: 'scale(1)'}))
+				style({ opacity: 0, transform: 'scale(0.8)' }),
+				animate('0.6s 0.3s ease-out', style({ opacity: 1, transform: 'scale(1)' }))
 			])
 		]),
 		trigger('bounce', [
 			transition(':enter', [
-				style({transform: 'scale(0)'}),
-				animate('0.5s 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55)', style({transform: 'scale(1)'}))
+				style({ transform: 'scale(0)' }),
+				animate('0.5s 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55)', style({ transform: 'scale(1)' }))
 			])
 		])
 	],
-	styles: [`
+	styles: [ `
 		.celebration-bg {
 			background: linear-gradient(135deg, #10b981 0%, #059669 30%, #047857 100%);
 			min-height: 100vh;
@@ -76,7 +76,7 @@ import {SoundService} from '../../services/sound.service';
 			0%, 100% { transform: translateY(0) rotate(-5deg); }
 			50% { transform: translateY(-10px) rotate(5deg); }
 		}
-	`],
+	` ],
 	template: `
 		<div class="celebration-bg text-white relative">
 			<!-- Confetti -->
@@ -100,7 +100,8 @@ import {SoundService} from '../../services/sound.service';
 
 				<!-- Winner Section -->
 				<div class="text-center mb-8" @fadeIn>
-					<div class="bg-yellow-400 text-green-900 rounded-full px-8 py-4 inline-block mb-4 transform shadow-2xl">
+					<div
+						class="bg-yellow-400 text-green-900 rounded-full px-8 py-4 inline-block mb-4 transform shadow-2xl">
 						<div class="text-2xl font-bold mb-1">🥇 VOITTAJA</div>
 						<div class="text-4xl font-bold">{{ getWinner()?.playerName || 'Tuntematon' }}</div>
 					</div>
@@ -112,9 +113,9 @@ import {SoundService} from '../../services/sound.service';
 						<h3 class="text-2xl font-bold mb-4 text-center">🏅 LOPPUTULOKSET</h3>
 						<div class="space-y-3">
 							<div *ngFor="let result of getFinalRanking(); let i = index"
-							     class="flex items-center justify-between p-3 rounded-lg"
-							     [class.bg-yellow-500]="i === 0"
-							     [class.bg-gray-300]="i === 1"
+								class="flex items-center justify-between p-3 rounded-lg"
+								[class.bg-yellow-500]="i === 0"
+								 [class.bg-gray-300]="i === 1"
 							     [class.bg-orange-400]="i === 2"
 							     [class.bg-black]="i > 2"
 							     [class.text-green-900]="i === 0"
@@ -247,6 +248,6 @@ export class TournamentEndedComponent implements OnInit {
 	}
 
 	viewSeasonStandings(): void {
-		this.router.navigate(['/standings']);
+		this.router.navigate([ '/standings' ]);
 	}
 }

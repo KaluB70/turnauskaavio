@@ -113,3 +113,4 @@ The application follows a tournament lifecycle:
 - Simplified error handling with try-catch blocks
 - Consistent variable naming and code structure
 - Comprehensive documentation in CLAUDE.md and README.md
+- Use bun for package management

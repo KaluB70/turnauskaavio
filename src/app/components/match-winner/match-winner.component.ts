@@ -1,22 +1,22 @@
-import {Component, OnInit, OnDestroy} from '@angular/core';
-import {CommonModule} from '@angular/common';
-import {trigger, transition, style, animate} from '@angular/animations';
-import {TournamentService} from '../../services/tournament.service';
-import {SoundService} from '../../services/sound.service';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { trigger, transition, style, animate } from '@angular/animations';
+import { TournamentService } from '../../services/tournament.service';
+import { SoundService } from '../../services/sound.service';
 
 @Component({
 	selector: 'match-winner',
 	standalone: true,
-	imports: [CommonModule],
+	imports: [ CommonModule ],
 	animations: [
 		trigger('fadeInOut', [
 			transition(':enter', [
-				style({opacity: 0, transform: 'scale(0.8)'}),
-				animate('0.5s ease-in', style({opacity: 1, transform: 'scale(1)'}))
+				style({ opacity: 0, transform: 'scale(0.8)' }),
+				animate('0.5s ease-in', style({ opacity: 1, transform: 'scale(1)' }))
 			])
 		])
 	],
-	styles: [`
+	styles: [ `
 		.winner-overlay {
 			position: fixed;
 			top: 0;
@@ -65,7 +65,7 @@ import {SoundService} from '../../services/sound.service';
 			font-size: 0.875rem;
 			margin-bottom: 1rem;
 		}
-	`],
+	` ],
 	template: `
 		<div class="winner-overlay" @fadeInOut>
 			<div class="winner-card" @fadeInOut (click)="$event.stopPropagation()">
@@ -98,13 +98,13 @@ export class MatchWinnerComponent implements OnInit, OnDestroy {
 		const isFinal = this.isFinalMatch();
 		const matchesComplete = this.tournamentService.matches.filter(m => m.isComplete).length;
 		const totalMatches = this.tournamentService.matches.length;
-		
+
 		// Check if tournament is actually completed (regardless of phase detection issues)
 		const isActuallyComplete = this.tournamentService.tournamentCompleted;
-		
+
 		// For 3-player tournaments, the 3rd match is always the tournament winner
 		const isThirdMatchIn3Player = this.tournamentService.players.length === 3 && matchesComplete === totalMatches;
-		
+
 		// Also play tournament sound for final phase matches or completed tournaments
 		if (isFinal || this.tournamentService.currentPhase === 'final' || isActuallyComplete || isThirdMatchIn3Player) {
 			this.soundService.playTournamentWon();

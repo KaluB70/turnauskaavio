@@ -11,7 +11,8 @@
       "Bash(mkdir:*)",
       "Bash(npx tsc:*)",
       "Bash(rg:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(bun add:*)"
     ],
     "deny": []
   }

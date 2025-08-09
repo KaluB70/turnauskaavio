@@ -1,34 +1,51 @@
-import {Component, OnDestroy, OnInit} from '@angular/core';
-import {CommonModule} from '@angular/common';
-import {animate, style, transition, trigger} from '@angular/animations';
-import {TournamentService} from '../../services/tournament.service';
-import {SoundService} from '../../services/sound.service';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { animate, style, transition, trigger } from '@angular/animations';
+import { TournamentService } from '../../services/tournament.service';
+import { SoundService } from '../../services/sound.service';
 
 @Component({
 	selector: 'roulette',
 	standalone: true,
-	imports: [CommonModule],
+	imports: [ CommonModule ],
 	animations: [
 		trigger('fadeIn', [
 			transition(':enter', [
-				style({opacity: 0}),
-				animate('1s ease', style({opacity: 1}))
+				style({ opacity: 0 }),
+				animate('1s ease', style({ opacity: 1 }))
 			])
 		])
 	],
-	styles: [`
+	styles: [ `
 		.roulette-container {
-			background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+			background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 75%, #475569 100%);
 			color: white;
+			position: relative;
+			overflow: hidden;
+		}
+		.roulette-container::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background:
+				radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+				radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
 		}
 		.player-card {
 			transition: all 0.3s ease;
 			animation: nameRoll 200ms linear infinite;
+			background: rgba(255, 255, 255, 0.1);
+			backdrop-filter: blur(10px);
+			border: 1px solid rgba(255, 255, 255, 0.2);
 		}
 		.player-card.locked {
 			animation: none;
-			background-color: rgba(255, 255, 255, 0.2);
+			background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.3));
 			border-left: 4px solid #10b981;
+			box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
 		}
 		@keyframes nameRoll {
 			0%, 100% { opacity: 1; }
@@ -69,7 +86,33 @@ import {SoundService} from '../../services/sound.service';
 				transform: translate3d(0,-2px,0);
 			}
 		}
-	`],
+		.modern-btn {
+			transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+			position: relative;
+			overflow: hidden;
+			cursor: pointer;
+		}
+		.modern-btn::before {
+			content: '';
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			width: 0;
+			height: 0;
+			background: rgba(255, 255, 255, 0.2);
+			border-radius: 50%;
+			transition: all 0.3s ease;
+			transform: translate(-50%, -50%);
+		}
+		.modern-btn:hover:not(:disabled)::before {
+			width: 300px;
+			height: 300px;
+		}
+		.modern-btn:hover:not(:disabled) {
+			transform: translateY(-2px);
+			box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+		}
+	` ],
 	template: `
 		<div class="roulette-container min-h-screen flex items-center justify-center p-6 relative overflow-hidden"
 			 @fadeIn>
@@ -132,17 +175,17 @@ import {SoundService} from '../../services/sound.service';
 					</div>
 				</div>
 
-				<div *ngIf="allLocked" class="mt-8">
-					<div class="text-lg mb-4 text-green-300 font-semibold">
+				<div *ngIf="allLocked" class="mt-8 relative z-20">
+					<div class="text-lg mb-4 text-emerald-300 font-semibold">
 						{{
 							tournamentService.tournamentType === 'round-robin' ?
 								'Pelausjärjestys arvottu!' :
-								(tournamentService.tournamentType === 'groups-3' ? '3 lohkoa muodostettu!' : 'Lohkot muodostettu!')
+								'Lohkot muodostettu!'
 						}}
 					</div>
 					<button
 						(click)="startTournament()"
-						class="bg-green-600 hover:bg-green-700 text-white py-4 px-8 rounded-full text-2xl font-bold transition-colors">
+						class="modern-btn bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white py-4 px-8 rounded-xl text-2xl font-bold shadow-xl relative z-30 transition-all duration-300">
 						🏁 Aloita Turnaus!
 					</button>
 				</div>
@@ -154,7 +197,7 @@ export class RouletteComponent implements OnInit, OnDestroy {
 	displayPlayers: string[] = [];
 	groups: string[][] = [];
 	lockedPlayers: number[] = [];
-	lockedGroupPlayers: {[groupIndex: number]: number[]} = {};
+	lockedGroupPlayers: Record<number, number[]> = {};
 	currentTitle = 'Sekoitetaan pelaajia...';
 	currentDescription = 'Arvotaan turnausasetelma';
 	allLocked = false;
@@ -164,7 +207,7 @@ export class RouletteComponent implements OnInit, OnDestroy {
 	private rollingNames: string[][] = [];
 	private rollingGroups: string[][][] = [];
 
-	confettiColors = ['#fbbf24', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#f59e0b'];
+	confettiColors = [ '#fbbf24', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#f59e0b' ];
 
 	constructor(
 		protected tournamentService: TournamentService,
@@ -201,11 +244,11 @@ export class RouletteComponent implements OnInit, OnDestroy {
 			: 'Arvotaan pelausjärjestys karsintoihin';
 
 		// Shuffle players for final order
-		this.displayPlayers = [...this.tournamentService.players.map(p => p.name)]
+		this.displayPlayers = [ ...this.tournamentService.players.map(p => p.name) ]
 			.sort(() => Math.random() - 0.5);
 
 		this.rollingNames = this.displayPlayers.map(() =>
-			[...this.displayPlayers].sort(() => Math.random() - 0.5)
+			[ ...this.displayPlayers ].sort(() => Math.random() - 0.5)
 		);
 	}
 
@@ -215,7 +258,7 @@ export class RouletteComponent implements OnInit, OnDestroy {
 			: 'Muodostetaan lohkot ja arvotaan ryhmät';
 
 		const playerNames = this.tournamentService.players.map(p => p.name);
-		const shuffled = [...playerNames].sort(() => Math.random() - 0.5);
+		const shuffled = [ ...playerNames ].sort(() => Math.random() - 0.5);
 		const groupCount = this.tournamentService.tournamentType === 'groups-3' ? 3 : 2;
 		const groupSize = Math.ceil(shuffled.length / groupCount);
 
@@ -228,7 +271,7 @@ export class RouletteComponent implements OnInit, OnDestroy {
 
 		// Create rolling names for each group position
 		this.rollingGroups = this.groups.map(group =>
-			group.map(() => [...playerNames].sort(() => Math.random() - 0.5))
+			group.map(() => [ ...playerNames ].sort(() => Math.random() - 0.5))
 		);
 
 		// Initialize locked states for groups
@@ -277,7 +320,7 @@ export class RouletteComponent implements OnInit, OnDestroy {
 				this.lockedPlayers.push(this.lockedPlayers.length);
 				// Play lock sound for each player
 				this.soundService.playRouletteLock();
-				
+
 				// Speed up roulette sound based on how many are locked
 				const speedMultiplier = 1.0 + (this.lockedPlayers.length * 0.3);
 				this.soundService.speedUpRouletteSpin(speedMultiplier);
@@ -324,11 +367,11 @@ export class RouletteComponent implements OnInit, OnDestroy {
 						totalLocked++;
 						// Play lock sound for each player
 						this.soundService.playRouletteLock();
-						
+
 						// Speed up roulette sound based on how many are locked
 						const speedMultiplier = 1.0 + (totalLocked * 0.2);
 						this.soundService.speedUpRouletteSpin(speedMultiplier);
-						
+
 						break;
 					}
 				}

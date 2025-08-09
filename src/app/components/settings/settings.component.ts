@@ -1,139 +1,210 @@
-import {Component} from '@angular/core';
-import {CommonModule} from '@angular/common';
-import {FormsModule} from '@angular/forms';
-import {TournamentService} from '../../services/tournament.service';
-import {DriveService} from '../../services/drive.service';
-import {Router} from '@angular/router';
-import {firstValueFrom} from 'rxjs';
+import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { TournamentService } from '../../services/tournament.service';
+import { DriveService } from '../../services/drive.service';
+import { Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
 	selector: 'app-settings',
 	standalone: true,
-	imports: [CommonModule, FormsModule],
+	imports: [ CommonModule, FormsModule ],
+	styles: [ `
+		.settings-bg {
+			background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 75%, #475569 100%);
+			min-height: 100vh;
+			position: relative;
+			overflow: hidden;
+		}
+		.settings-bg::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background:
+				radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+				radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+		}
+		.glass-card {
+			background: rgba(255, 255, 255, 0.1);
+			backdrop-filter: blur(20px);
+			border: 1px solid rgba(255, 255, 255, 0.2);
+			box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+		}
+		.input-field {
+			transition: all 0.2s ease;
+			border: 2px solid transparent;
+			background: rgba(255, 255, 255, 0.1);
+			backdrop-filter: blur(10px);
+			color: white;
+		}
+		.input-field:focus {
+			border-color: #6366f1;
+			box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+			background: rgba(255, 255, 255, 0.15);
+		}
+		.input-field::placeholder {
+			color: rgba(255, 255, 255, 0.6);
+		}
+		.modern-btn {
+			transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+			position: relative;
+			overflow: hidden;
+		}
+		.modern-btn::before {
+			content: '';
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			width: 0;
+			height: 0;
+			background: rgba(255, 255, 255, 0.2);
+			border-radius: 50%;
+			transition: all 0.3s ease;
+			transform: translate(-50%, -50%);
+		}
+		.modern-btn:hover:not(:disabled)::before {
+			width: 300px;
+			height: 300px;
+		}
+		.modern-btn:hover:not(:disabled) {
+			transform: translateY(-1px);
+			box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+		}
+	` ],
 	template: `
-		<div class="container mx-auto px-4 py-8 max-w-2xl">
-			<h1 class="text-3xl font-bold text-center mb-8">⚙️ Asetukset</h1>
+		<div class="settings-bg min-h-screen relative">
+			<div class="container mx-auto px-4 py-8 max-w-3xl relative z-20">
+				<h1 class="text-4xl font-bold text-center mb-8 text-white">⚙️ Asetukset</h1>
 
-			<div class="bg-white p-6 rounded-lg shadow-lg mb-6">
-				<h2 class="text-xl font-semibold mb-4">Google Drive Integration</h2>
+				<div class="glass-card p-8 rounded-2xl shadow-xl mb-8">
+					<h2 class="text-2xl font-semibold mb-6 text-white">Google Drive Integration</h2>
 
-				<div class="mb-4">
-					<label for="fileId" class="block text-sm font-medium text-gray-700 mb-2">
-						Drive File ID (valinnainen):
-					</label>
-					<input
-						id="fileId"
-						type="text"
-						[(ngModel)]="fileId"
-						placeholder="1ABC...XYZ (Google Drive JSON file ID)"
-						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-					<p class="text-xs text-gray-500 mt-1">
-						Google Drive JSON-tiedoston ID (jos haluat ladata tiettyä tiedostoa)
+					<div class="mb-6">
+						<label for="fileId" class="block text-sm font-medium text-slate-300 mb-3">
+							Drive File ID (valinnainen):
+						</label>
+						<input
+							id="fileId"
+							type="text"
+							[(ngModel)]="fileId"
+							placeholder="1ABC...XYZ (Google Drive JSON file ID)"
+							class="input-field w-full p-4 rounded-xl focus:outline-none">
+						<p class="text-xs text-slate-400 mt-2">
+							Google Drive JSON-tiedoston ID (jos haluat ladata tiettyä tiedostoa)
+						</p>
+					</div>
+
+					<div class="mb-6">
+						<label for="apiKey" class="block text-sm font-medium text-slate-300 mb-3">
+							API Key:
+						</label>
+						<input
+							id="apiKey"
+							type="text"
+							[(ngModel)]="apiKey"
+							placeholder="Google Cloud API Key"
+							class="input-field w-full p-4 rounded-xl focus:outline-none">
+						<p class="text-xs text-slate-400 mt-2">
+							Google Cloud API key (Drive API:lle)
+						</p>
+					</div>
+
+					<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+						<button
+							(click)="testConnection()"
+							[disabled]="!apiKey || testing"
+							class="modern-btn bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-4 py-3 rounded-xl font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed relative z-10">
+							{{ testing ? 'Testataan...' : 'Testaa yhteys' }}
+						</button>
+
+						<button
+							(click)="saveConfig()"
+							[disabled]="!apiKey"
+							class="modern-btn bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-3 rounded-xl font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed relative z-10">
+							Tallenna asetukset
+						</button>
+
+						<button
+							(click)="loadFromDrive()"
+							[disabled]="!isConfigured || loading"
+							class="modern-btn bg-gradient-to-r from-purple-500 to-purple-600 text-white px-4 py-3 rounded-xl font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed relative z-10">
+							{{ loading ? 'Ladataan...' : 'Lataa Drive:sta' }}
+						</button>
+
+						<button
+							(click)="generateShareableLink()"
+							[disabled]="!apiKey"
+							class="modern-btn bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 py-3 rounded-xl font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed relative z-10">
+							🔗 Luo jaettava linkki
+						</button>
+					</div>
+
+					<div class="mb-6 p-4 bg-white/10 rounded-xl backdrop-blur-sm">
+						<p class="text-sm text-slate-300">
+							<strong class="text-white">Paikallista dataa:</strong> {{ getLocalDataInfo() }}
+						</p>
+					</div>
+
+					<div *ngIf="statusMessage"
+					     class="p-4 rounded-xl mb-6 backdrop-blur-sm"
+					     [class.bg-emerald-500]="statusType === 'success'"
+					     [class.bg-red-500]="statusType === 'error'"
+					     [class.bg-indigo-500]="statusType === 'info'"
+					     [class.border-emerald-400]="statusType === 'success'"
+					     [class.border-red-400]="statusType === 'error'"
+					     [class.border-indigo-400]="statusType === 'info'"
+					     style="border-width: 1px; border-style: solid;">
+						<p [class.text-emerald-200]="statusType === 'success'"
+						   [class.text-red-200]="statusType === 'error'"
+						   [class.text-indigo-200]="statusType === 'info'">
+							{{ statusMessage }}
 					</p>
+					</div>
 				</div>
 
-				<div class="mb-4">
-					<label for="apiKey" class="block text-sm font-medium text-gray-700 mb-2">
-						API Key:
-					</label>
-					<input
-						id="apiKey"
-						type="text"
-						[(ngModel)]="apiKey"
-						placeholder="Google Cloud API Key"
-						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-					<p class="text-xs text-gray-500 mt-1">
-						Google Cloud API key (Drive API:lle)
-					</p>
+				<div class="glass-card p-8 rounded-2xl shadow-xl mb-8">
+					<h2 class="text-2xl font-semibold mb-6 text-white">📁 Import / Export</h2>
+
+					<div class="mb-6 p-4 bg-indigo-500/20 rounded-xl backdrop-blur-sm border border-indigo-400/30">
+						<p class="text-sm text-indigo-200">
+							<strong class="text-white">Paikallista dataa:</strong> {{ getLocalDataInfo() }}<br>
+							<strong class="text-white">Aktiivisia turnauksia:</strong> {{ getActiveTournamentCount() }} kpl
+						</p>
+					</div>
+
+					<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+						<button
+							(click)="exportData()"
+							class="modern-btn bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-3 rounded-xl font-semibold shadow-lg relative z-10">
+							💾 Vie data (JSON)
+						</button>
+
+						<label
+							class="modern-btn bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-4 py-3 rounded-xl font-semibold shadow-lg cursor-pointer text-center relative z-10">
+							📁 Tuo data (JSON)
+							<input type="file" accept=".json" (change)="importData($event)" class="hidden">
+						</label>
+
+						<button
+							(click)="clearAllData()"
+							class="modern-btn bg-gradient-to-r from-red-500 to-red-600 text-white px-4 py-3 rounded-xl font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed relative z-10"
+							[disabled]="clearing">
+							🗑️ {{ clearing ? 'Tyhjennetään...' : 'Tyhjennä kaikki' }}
+						</button>
+					</div>
 				</div>
 
-				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+				<div class="text-center">
 					<button
-						(click)="testConnection()"
-						[disabled]="!apiKey || testing"
-						class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
-						{{ testing ? 'Testataan...' : 'Testaa yhteys' }}
-					</button>
-
-					<button
-						(click)="saveConfig()"
-						[disabled]="!apiKey"
-						class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
-						Tallenna asetukset
-					</button>
-
-					<button
-						(click)="loadFromDrive()"
-						[disabled]="!isConfigured || loading"
-						class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
-						{{ loading ? 'Ladataan...' : 'Lataa Drive:sta' }}
-					</button>
-
-					<button
-						(click)="generateShareableLink()"
-						[disabled]="!apiKey"
-						class="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed">
-						🔗 Luo jaettava linkki
+						(click)="goBack()"
+						class="modern-btn glass-card text-white px-6 py-3 rounded-xl font-semibold shadow-lg relative z-10">
+						← Takaisin
 					</button>
 				</div>
-
-				<div class="mb-4 p-3 bg-gray-50 rounded-md">
-					<p class="text-sm text-gray-600">
-						<strong>Paikallista dataa:</strong> {{ getLocalDataInfo() }}
-					</p>
-				</div>
-
-				<div *ngIf="statusMessage"
-				     class="p-3 rounded-md mb-4"
-				     [class.bg-green-100]="statusType === 'success'"
-				     [class.bg-red-100]="statusType === 'error'"
-				     [class.bg-blue-100]="statusType === 'info'">
-					<p [class.text-green-700]="statusType === 'success'"
-					   [class.text-red-700]="statusType === 'error'"
-					   [class.text-blue-700]="statusType === 'info'">
-						{{ statusMessage }}
-					</p>
-				</div>
-			</div>
-
-			<div class="bg-white p-6 rounded-lg shadow-lg mb-6">
-				<h2 class="text-xl font-semibold mb-4">📁 Import / Export</h2>
-
-				<div class="mb-4 p-3 bg-blue-50 rounded-md">
-					<p class="text-sm text-blue-700">
-						<strong>Paikallista dataa:</strong> {{ getLocalDataInfo() }}<br>
-						<strong>Aktiivisia turnauksia:</strong> {{ getActiveTournamentCount() }} kpl
-					</p>
-				</div>
-
-				<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-					<button
-						(click)="exportData()"
-						class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
-						💾 Vie data (JSON)
-					</button>
-
-					<label
-						class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 cursor-pointer text-center">
-						📁 Tuo data (JSON)
-						<input type="file" accept=".json" (change)="importData($event)" class="hidden">
-					</label>
-
-					<button
-						(click)="clearAllData()"
-						class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 whitespace-nowrap"
-						[disabled]="clearing">
-						🗑️ {{ clearing ? 'Tyhjennetään...' : 'Tyhjennä kaikki' }}
-					</button>
-				</div>
-			</div>
-
-			<div class="text-center">
-				<button
-					(click)="goBack()"
-					class="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700">
-					← Takaisin
-				</button>
 			</div>
 		</div>
 	`
@@ -452,6 +523,6 @@ export class SettingsComponent {
 	}
 
 	goBack(): void {
-		this.router.navigate(['/']);
+		this.router.navigate([ '/' ]);
 	}
 }

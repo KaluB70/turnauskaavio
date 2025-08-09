@@ -1,15 +1,38 @@
-import {Component} from '@angular/core';
-import {CommonModule} from '@angular/common';
-import {FormsModule} from '@angular/forms';
-import {Router} from '@angular/router';
-import {TournamentService} from '../../services/tournament.service';
-import {MatchWinnerComponent} from '../match-winner/match-winner.component';
+import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import { TournamentService } from '../../services/tournament.service';
+import { MatchWinnerComponent } from '../match-winner/match-winner.component';
 
 @Component({
 	selector: 'current-match',
 	standalone: true,
-	imports: [CommonModule, FormsModule, MatchWinnerComponent],
-	styles: [`
+	imports: [ CommonModule, FormsModule, MatchWinnerComponent ],
+	styles: [ `
+		.match-bg {
+			background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 75%, #475569 100%);
+			min-height: 100vh;
+			position: relative;
+			overflow: hidden;
+		}
+		.match-bg::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background:
+				radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+				radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+		}
+		.glass-card {
+			background: rgba(255, 255, 255, 0.1);
+			backdrop-filter: blur(20px);
+			border: 1px solid rgba(255, 255, 255, 0.2);
+			box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+		}
 		.player-finished {
 			background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 			border: 3px solid #065f46 !important;
@@ -65,105 +88,163 @@ import {MatchWinnerComponent} from '../match-winner/match-winner.component';
 			text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
 			font-weight: bold;
 		}
-	`],
+		.modern-btn {
+			transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+			position: relative;
+			overflow: hidden;
+		}
+		.modern-btn::before {
+			content: '';
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			width: 0;
+			height: 0;
+			background: rgba(255, 255, 255, 0.2);
+			border-radius: 50%;
+			transition: all 0.3s ease;
+			transform: translate(-50%, -50%);
+		}
+		.modern-btn:hover:not(:disabled)::before {
+			width: 300px;
+			height: 300px;
+		}
+		.modern-btn:hover:not(:disabled) {
+			transform: translateY(-1px);
+			box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+		}
+		.badge-modern {
+			background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+			backdrop-filter: blur(10px);
+			border: 1px solid rgba(255, 255, 255, 0.3);
+			transition: all 0.2s ease;
+		}
+		.badge-modern:hover {
+			transform: translateY(-1px);
+			box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+		}
+		.result-row {
+			background: rgba(255, 255, 255, 0.1);
+			backdrop-filter: blur(5px);
+			border: 1px solid rgba(255, 255, 255, 0.1);
+			transition: all 0.2s ease;
+		}
+		.result-row:hover {
+			background: rgba(255, 255, 255, 0.15);
+		}
+		.result-row.winner {
+			background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(245, 158, 11, 0.3));
+			border-color: rgba(251, 191, 36, 0.4);
+		}
+		.result-row.second {
+			background: linear-gradient(135deg, rgba(156, 163, 175, 0.3), rgba(107, 114, 128, 0.3));
+			border-color: rgba(156, 163, 175, 0.4);
+		}
+		.result-row.third {
+			background: linear-gradient(135deg, rgba(251, 146, 60, 0.3), rgba(249, 115, 22, 0.3));
+			border-color: rgba(251, 146, 60, 0.4);
+		}
+	` ],
 	template: `
 		<match-winner *ngIf="tournamentService.showMatchWinner"></match-winner>
 
-		<div class="bg-blue-100 p-6 rounded-lg shadow border-2 border-blue-300">
-			<h2 class="text-xl font-semibold mb-4">Nykyinen ottelu</h2>
+		<div class="match-bg min-h-screen relative">
+			<div class="w-full px-4 py-8 relative z-20">
+				<div class="glass-card rounded-2xl p-8 shadow-xl max-w-6xl mx-auto mb-8">
+					<h2 class="text-4xl font-bold mb-8 text-white text-center">⚡ Nykyinen ottelu</h2>
 
 			<div *ngIf="tournamentService.currentMatch; let match">
-				<div class="mb-4 text-center">
-					<span class="text-sm bg-blue-600 text-white py-1 px-3 rounded-full">
+				<div class="mb-8 flex justify-center flex-wrap gap-3">
+					<span class="badge-modern text-white py-2 px-4 rounded-xl text-sm font-medium shadow-lg">
 						{{ getRoundText(match) }}
 					</span>
-					<span class="ml-2 text-sm bg-green-600 text-white py-1 px-3 rounded-full">
+					<span class="badge-modern text-white py-2 px-4 rounded-xl text-sm font-medium shadow-lg">
 						BO{{ getEffectiveBestOf(match) }}
 					</span>
-					<span class="ml-2 text-sm bg-purple-600 text-white py-1 px-3 rounded-full">
+					<span class="badge-modern text-white py-2 px-4 rounded-xl text-sm font-medium shadow-lg">
 						{{ tournamentService.gameMode }}
 					</span>
 					<span *ngIf="match.round === 'playoff'"
-					      class="ml-2 text-sm bg-red-600 text-white py-1 px-3 rounded-full">
-						KARSINTA
+					      class="bg-gradient-to-r from-red-500 to-red-600 text-white py-2 px-4 rounded-xl text-sm font-medium shadow-lg backdrop-blur-sm border border-white/20">
+						⚡ KARSINTA
 					</span>
 				</div>
 
 				<!-- 3-way Final -->
 				<div *ngIf="tournamentService.is3WayFinal() && match.round === 'final'" class="mb-6">
 					<div class="text-center mb-4">
-						<h3 class="text-xl font-bold text-green-600">🏆 Finaali</h3>
-						<p class="text-sm text-gray-600">Kolme pelaajaa samassa ottelussa</p>
-						<p class="text-xs text-amber-600 font-medium mt-1">
+						<h3 class="text-xl font-bold text-emerald-300">🏆 Finaali</h3>
+						<p class="text-sm text-slate-300">Kolme pelaajaa samassa ottelussa</p>
+						<p class="text-xs text-amber-300 font-medium mt-1">
 							Turnaus päättyy kun 2 pelaajaa saavuttaa {{ getLegsToWin(match) }} legiä
 						</p>
 					</div>
 
 					<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-						<div class="text-center bg-white p-4 rounded-lg border-2 border-blue-300 relative"
+						<div class="text-center glass-card p-4 rounded-xl border-2 border-indigo-400/30 relative"
 						     [class.player-finished]="isPlayerFinished(match.player1Id)"
 						     [class.rank-1]="isPlayerFinished(match.player1Id) && getPlayerRank(match.player1Id) === 1"
 						     [class.rank-2]="isPlayerFinished(match.player1Id) && getPlayerRank(match.player1Id) === 2"
 						     [class.rank-3]="isPlayerFinished(match.player1Id) && getPlayerRank(match.player1Id) === 3">
 							<div *ngIf="isPlayerFinished(match.player1Id)" class="confetti-overlay"></div>
-							<div class="font-bold text-xl mb-2"
+							<div class="font-bold text-xl mb-2 text-white"
 							     [class.winner-text]="isPlayerFinished(match.player1Id)">{{ tournamentService.getPlayerName(match.player1Id) }}</div>
-							<div class="text-lg font-bold mb-3"
+							<div class="text-lg font-bold mb-3 text-white"
 							     [class.winner-text]="isPlayerFinished(match.player1Id)">
 								Legit: {{ match.player1Legs }}
 								<span *ngIf="isPlayerFinished(match.player1Id)" class="ml-2 text-sm">✅ Valmis!</span>
 							</div>
-							<div class="flex justify-center space-x-2">
+							<div class="flex justify-center space-x-3">
 								<button (click)="adjustLegs(match, 'player1', -1)"
-								        class="bg-gray-200 text-gray-800 py-1 px-3 rounded-md hover:bg-gray-300 font-bold"
-								        [disabled]="match.player1Legs <= 0">-</button>
+								        class="modern-btn bg-gradient-to-r from-slate-500 to-slate-600 text-white py-3 px-5 rounded-xl font-bold shadow-lg disabled:opacity-50 relative z-10 text-xl"
+								        [disabled]="match.player1Legs <= 0">−</button>
 								<button (click)="adjustLegs(match, 'player1', 1)"
-								        class="bg-blue-600 text-white py-1 px-3 rounded-md hover:bg-blue-700 font-bold">+</button>
+								        class="modern-btn bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-3 px-5 rounded-xl font-bold shadow-lg relative z-10 text-xl">+</button>
 							</div>
 						</div>
 
-						<div class="text-center bg-white p-4 rounded-lg border-2 border-blue-300 relative"
+						<div class="text-center glass-card p-4 rounded-xl border-2 border-indigo-400/30 relative"
 						     [class.player-finished]="isPlayerFinished(match.player2Id)"
 						     [class.rank-1]="isPlayerFinished(match.player2Id) && getPlayerRank(match.player2Id) === 1"
 						     [class.rank-2]="isPlayerFinished(match.player2Id) && getPlayerRank(match.player2Id) === 2"
 						     [class.rank-3]="isPlayerFinished(match.player2Id) && getPlayerRank(match.player2Id) === 3">
 							<div *ngIf="isPlayerFinished(match.player2Id)" class="confetti-overlay"></div>
-							<div class="font-bold text-xl mb-2"
+							<div class="font-bold text-xl mb-2 text-white"
 							     [class.winner-text]="isPlayerFinished(match.player2Id)">{{ tournamentService.getPlayerName(match.player2Id) }}</div>
-							<div class="text-lg font-bold mb-3"
+							<div class="text-lg font-bold mb-3 text-white"
 							     [class.winner-text]="isPlayerFinished(match.player2Id)">
 								Legit: {{ match.player2Legs }}
 								<span *ngIf="isPlayerFinished(match.player2Id)" class="ml-2 text-sm">✅ Valmis!</span>
 							</div>
-							<div class="flex justify-center space-x-2">
+							<div class="flex justify-center space-x-3">
 								<button (click)="adjustLegs(match, 'player2', -1)"
-								        class="bg-gray-200 text-gray-800 py-1 px-3 rounded-md hover:bg-gray-300 font-bold"
-								        [disabled]="match.player2Legs <= 0">-</button>
+								        class="modern-btn bg-gradient-to-r from-slate-500 to-slate-600 text-white py-3 px-5 rounded-xl font-bold shadow-lg disabled:opacity-50 relative z-10 text-xl"
+								        [disabled]="match.player2Legs <= 0">−</button>
 								<button (click)="adjustLegs(match, 'player2', 1)"
-								        class="bg-blue-600 text-white py-1 px-3 rounded-md hover:bg-blue-700 font-bold">+</button>
+								        class="modern-btn bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-3 px-5 rounded-xl font-bold shadow-lg relative z-10 text-xl">+</button>
 							</div>
 						</div>
 
 						<div *ngIf="match.player3Id"
-						     class="text-center bg-white p-4 rounded-lg border-2 border-blue-300 relative"
+						     class="text-center glass-card p-4 rounded-xl border-2 border-indigo-400/30 relative"
 						     [class.player-finished]="isPlayerFinished(match.player3Id)"
 						     [class.rank-1]="isPlayerFinished(match.player3Id) && getPlayerRank(match.player3Id) === 1"
 						     [class.rank-2]="isPlayerFinished(match.player3Id) && getPlayerRank(match.player3Id) === 2"
 						     [class.rank-3]="isPlayerFinished(match.player3Id) && getPlayerRank(match.player3Id) === 3">
 							<div *ngIf="isPlayerFinished(match.player3Id)" class="confetti-overlay"></div>
-							<div class="font-bold text-xl mb-2"
+							<div class="font-bold text-xl mb-2 text-white"
 							     [class.winner-text]="isPlayerFinished(match.player3Id)">{{ tournamentService.getPlayerName(match.player3Id) }}</div>
-							<div class="text-lg font-bold mb-3"
+							<div class="text-lg font-bold mb-3 text-white"
 							     [class.winner-text]="isPlayerFinished(match.player3Id)">
 								Legit: {{ match.player3Legs }}
 								<span *ngIf="isPlayerFinished(match.player3Id)" class="ml-2 text-sm">✅ Valmis!</span>
 							</div>
-							<div class="flex justify-center space-x-2">
+							<div class="flex justify-center space-x-3">
 								<button (click)="adjustThirdPlayerLegs(-1)"
-								        class="bg-gray-200 text-gray-800 py-1 px-3 rounded-md hover:bg-gray-300 font-bold"
-								        [disabled]="(match.player3Legs || 0) <= 0">-</button>
+								        class="modern-btn bg-gradient-to-r from-slate-500 to-slate-600 text-white py-3 px-5 rounded-xl font-bold shadow-lg disabled:opacity-50 relative z-10 text-xl"
+								        [disabled]="(match.player3Legs || 0) <= 0">−</button>
 								<button (click)="adjustThirdPlayerLegs(1)"
-								        class="bg-blue-600 text-white py-1 px-3 rounded-md hover:bg-blue-700 font-bold">+</button>
+								        class="modern-btn bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-3 px-5 rounded-xl font-bold shadow-lg relative z-10 text-xl">+</button>
 							</div>
 						</div>
 					</div>
@@ -173,95 +254,102 @@ import {MatchWinnerComponent} from '../match-winner/match-winner.component';
 				<div *ngIf="!tournamentService.is3WayFinal() || match.round !== 'final'"
 				     class="flex flex-col md:flex-row justify-between items-center mb-6">
 					<div class="text-center w-full md:w-2/5 mb-4 md:mb-0">
-						<div class="font-bold text-3xl">{{ tournamentService.getPlayerName(match.player1Id) }}</div>
+						<div class="font-bold text-3xl text-white">{{ tournamentService.getPlayerName(match.player1Id) }}</div>
 						<div class="mt-4 mb-3">
-							<div class="text-2xl font-bold">Legit: {{ match.player1Legs }}</div>
+							<div class="text-2xl font-bold text-white">Legit: {{ match.player1Legs }}</div>
 						</div>
-						<div class="flex justify-center items-center mt-4">
+						<div class="flex justify-center items-center mt-4 space-x-4">
 							<button (click)="adjustLegs(match, 'player1', -1)"
-							        class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 mr-2 text-lg font-bold"
-							        [disabled]="match.player1Legs <= 0">-</button>
+							        class="modern-btn bg-gradient-to-r from-slate-500 to-slate-600 text-white py-3 px-6 rounded-xl font-bold shadow-lg disabled:opacity-50 relative z-10 text-2xl"
+							        [disabled]="match.player1Legs <= 0">−</button>
 							<button (click)="adjustLegs(match, 'player1', 1)"
-							        class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 text-lg font-bold">+</button>
+							        class="modern-btn bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-3 px-6 rounded-xl font-bold shadow-lg relative z-10 text-2xl">+</button>
 						</div>
 					</div>
 
-					<div class="text-3xl font-bold mb-4 md:mb-0">vs</div>
+					<div class="text-3xl font-bold mb-4 md:mb-0 text-white">vs</div>
 
 					<div class="text-center w-full md:w-2/5">
-						<div class="font-bold text-3xl">{{ tournamentService.getPlayerName(match.player2Id) }}</div>
+						<div class="font-bold text-3xl text-white">{{ tournamentService.getPlayerName(match.player2Id) }}</div>
 						<div class="mt-4 mb-3">
-							<div class="text-2xl font-bold">Legit: {{ match.player2Legs }}</div>
+							<div class="text-2xl font-bold text-white">Legit: {{ match.player2Legs }}</div>
 						</div>
-						<div class="flex justify-center items-center mt-4">
+						<div class="flex justify-center items-center mt-4 space-x-4">
 							<button (click)="adjustLegs(match, 'player2', -1)"
-							        class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 mr-2 text-lg font-bold"
-							        [disabled]="match.player2Legs <= 0">-</button>
+							        class="modern-btn bg-gradient-to-r from-slate-500 to-slate-600 text-white py-3 px-6 rounded-xl font-bold shadow-lg disabled:opacity-50 relative z-10 text-2xl"
+							        [disabled]="match.player2Legs <= 0">−</button>
 							<button (click)="adjustLegs(match, 'player2', 1)"
-							        class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 text-lg font-bold">+</button>
+							        class="modern-btn bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-3 px-6 rounded-xl font-bold shadow-lg relative z-10 text-2xl">+</button>
 						</div>
 					</div>
 				</div>
 
-				<div class="text-center text-sm text-gray-600">
-					Voittoon tarvitaan {{ getLegsToWin(match) }} legiä
+				<div class="text-center text-sm mb-8 text-slate-300 font-medium">
+					🏆 Voittoon tarvitaan {{ getLegsToWin(match) }} legiä
 				</div>
 			</div>
 
 			<div *ngIf="!tournamentService.currentMatch" class="text-center">
-				<div class="text-xl font-bold text-green-700 mb-4">
-					{{ getCompletionMessage() }}
+				<div class="text-xl font-bold text-emerald-300 mb-4">
+					🎉 {{ getCompletionMessage() }}
 				</div>
 
 				<div *ngIf="isFullyComplete()">
-					<div class="mb-4 p-4 bg-green-50 rounded-lg">
-						<h3 class="font-semibold mb-3">🏆 Illan tulokset:</h3>
-						<div class="space-y-2">
+					<div class="mb-4 p-6 glass-card rounded-xl">
+						<h3 class="font-semibold mb-4 text-white text-lg">🏆 Illan tulokset:</h3>
+						<div class="space-y-3">
 							<div *ngFor="let standing of getFinalResults(); let i = index"
-							     class="flex justify-between items-center p-2 rounded"
-							     [class.bg-yellow-200]="i === 0"
-							     [class.bg-gray-100]="i === 1"
-							     [class.bg-orange-100]="i === 2">
+							     class="result-row flex justify-between items-center p-4 rounded-xl"
+							     [class.winner]="i === 0"
+							     [class.second]="i === 1"
+							     [class.third]="i === 2">
 								<div class="flex items-center">
-									<span class="font-bold mr-2">{{ i + 1 }}.</span>
-									<span>{{ standing.playerName }}</span>
-									<span *ngIf="i < 3" class="ml-2 text-xs bg-green-600 text-white px-2 py-1 rounded-full">
+									<span class="font-bold mr-3 text-white text-lg">{{ i + 1 }}.</span>
+									<span class="text-white font-medium">{{ standing.playerName }}</span>
+									<span *ngIf="i < 3" class="ml-3 text-xs bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-3 py-1 rounded-full font-medium shadow-sm">
 										+{{ getWeeklyPoints(i + 1) }}p
 									</span>
 								</div>
-								<div class="text-sm text-gray-600">
+								<div class="text-sm text-slate-300 font-medium">
 									{{ standing.wins }}V - {{ standing.losses }}T
 									({{ standing.legDifference >= 0 ? '+' : '' }}{{ standing.legDifference }})
 								</div>
 							</div>
 						</div>
 
-						<div class="mt-4 p-3 bg-green-200 rounded-lg text-center">
-							<div class="font-semibold">💰 Viikkopotti voittajalle:</div>
-							<div class="text-xl font-bold text-green-700">{{ tournamentService.players.length * 2.5 }}€</div>
+						<div class="mt-6 p-4 bg-gradient-to-r from-emerald-500/20 to-emerald-600/20 rounded-xl text-center border border-emerald-400/30">
+							<div class="font-semibold text-emerald-200 mb-1">💰 Viikkopotti voittajalle:</div>
+							<div class="text-2xl font-bold text-emerald-300">{{ tournamentService.players.length * 2.5 }}€</div>
 						</div>
 					</div>
 
 					<div class="flex justify-center mt-6 space-x-4">
 						<button (click)="startNew()"
-						        class="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700">
-							Etusivu
+						        class="modern-btn bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 px-6 rounded-xl font-semibold shadow-lg relative z-10">
+							🏠 Etusivu
 						</button>
 						<button (click)="restartSame()"
-						        class="bg-green-600 text-white py-2 px-6 rounded-md hover:bg-green-700">
-							Uusi viikko samoilla pelaajilla
+						        class="modern-btn bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-3 px-6 rounded-xl font-semibold shadow-lg relative z-10">
+							🔄 Uusi viikko samoilla pelaajilla
 						</button>
 					</div>
 				</div>
 
 				<div *ngIf="!isFullyComplete() && tournamentService.isStarted">
-					<div class="text-lg text-blue-600 mb-4">
-						{{ getPhaseTransitionMessage() }}
+					<div class="text-lg text-indigo-300 mb-4 font-medium">
+						🎯 {{ getPhaseTransitionMessage() }}
 					</div>
 					<button (click)="continueToNext()"
-					        class="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700">
-						Jatka seuraavaan vaiheeseen
+					        class="modern-btn bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 px-8 rounded-xl font-semibold shadow-lg relative z-10">
+						➡️ Jatka seuraavaan vaiheeseen
 					</button>
+				</div>
+			</div>
+
+			<!-- Tournament Bracket Section -->
+			<div class="w-full px-4 pb-8 relative z-20">
+				<div class="glass-card rounded-2xl p-8 shadow-xl max-w-6xl mx-auto">
+					<ng-content></ng-content>
 				</div>
 			</div>
 		</div>
@@ -318,7 +406,7 @@ export class CurrentMatchComponent {
 	adjustLegs(match: any, player: 'player1' | 'player2', delta: number): void {
 		const legsToWin = this.getLegsToWin(match);
 		const playerId = player === 'player1' ? match.player1Id : match.player2Id;
-		
+
 		if (player === 'player1') {
 			const newLegs = Math.max(0, match.player1Legs + delta);
 			if (newLegs > legsToWin) {
@@ -349,20 +437,20 @@ export class CurrentMatchComponent {
 	adjustThirdPlayerLegs(delta: number): void {
 		const match = this.tournamentService.currentMatch;
 		if (!match || match.player3Legs === undefined) return;
-		
+
 		const legsToWin = this.getLegsToWin(match);
 		const newLegs = Math.max(0, match.player3Legs + delta);
 		if (delta > 0 && newLegs > legsToWin) {
 			return;
 		}
-		
+
 		match.player3Legs = newLegs;
-		
+
 		// Handle finish order updates for 3-way finals
 		if (this.tournamentService.is3WayFinal() && match.round === 'final') {
 			this.updateFinishOrderForAdjustment(match, match.player3Id!, legsToWin);
 		}
-		
+
 		// Save state after leg adjustment
 		this.tournamentService.saveTournamentState();
 		if (delta > 0) {
@@ -374,18 +462,18 @@ export class CurrentMatchComponent {
 		if (!match.finishOrder) {
 			match.finishOrder = [];
 		}
-		
+
 		const currentLegs = this.getCurrentLegsForPlayer(match, playerId);
 		const wasFinished = match.finishOrder.includes(playerId);
 		const isNowFinished = currentLegs >= legsToWin;
-		
+
 		if (wasFinished && !isNowFinished) {
 			// Player was finished but now isn't - remove from finish order
 			match.finishOrder = match.finishOrder.filter((id: number) => id !== playerId);
 		}
 		// Note: if player wasn't finished and now is, checkMatchCompletion() will handle adding them
 	}
-	
+
 	private getCurrentLegsForPlayer(match: any, playerId: number): number {
 		if (match.player1Id === playerId) return match.player1Legs;
 		if (match.player2Id === playerId) return match.player2Legs;
@@ -406,13 +494,13 @@ export class CurrentMatchComponent {
 			}
 
 			// Check each player and add to finish order when they reach required legs
-			const playerIds = [match.player1Id, match.player2Id, match.player3Id!];
-			const playerLegs = [match.player1Legs, match.player2Legs, match.player3Legs || 0];
+			const playerIds = [ match.player1Id, match.player2Id, match.player3Id! ];
+			const playerLegs = [ match.player1Legs, match.player2Legs, match.player3Legs || 0 ];
 
 			playerIds.forEach((playerId, index) => {
 				if (playerLegs[index] >= legsToWin && !match.finishOrder!.includes(playerId)) {
 					match.finishOrder!.push(playerId);
-					
+
 					// Save state immediately when a player finishes
 					this.tournamentService.saveTournamentState();
 				}
@@ -499,7 +587,7 @@ export class CurrentMatchComponent {
 	}
 
 	getWeeklyPoints(position: number): number {
-		return [0, 5, 3, 1, 0][position] || 0;
+		return [ 0, 5, 3, 1, 0 ][position] || 0;
 	}
 
 	continueToNext(): void {
@@ -508,7 +596,7 @@ export class CurrentMatchComponent {
 
 	startNew(): void {
 		this.tournamentService.reset();
-		this.router.navigate(['/']);
+		this.router.navigate([ '/' ]);
 	}
 
 	restartSame(): void {
@@ -518,6 +606,6 @@ export class CurrentMatchComponent {
 		const weekNumber = this.tournamentService.weekNumber + 1;
 
 		const tournamentId = this.tournamentService.register(playerNames, gameMode, bestOfLegs, weekNumber);
-		this.router.navigate(['/tournament', tournamentId]);
+		this.router.navigate([ '/tournament', tournamentId ]);
 	}
 }
